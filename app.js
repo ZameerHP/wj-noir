@@ -6,6 +6,7 @@ const fragrances = [
 ];
 const app = document.getElementById('app');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let stickyPurchaseUpdate;
 const escapeHtml = (s='') => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let selected = [];
 try { const saved = JSON.parse(localStorage.getItem('wj-noir-selection')||'[]'); selected = Array.isArray(saved)?saved.filter(id=>fragrances.some(p=>p.id===id)):[]; } catch {}
@@ -29,14 +30,153 @@ function home() { return `
   </main>`; }
 function shop() { return `<main class="interior-page"><section class="page-intro shop-intro"><span class="eyebrow ink-muted">WJ NOIR / THE COLLECTION</span><h1>Find your <em>signature.</em></h1><p>Three distinct expressions of the unforgettable. Discover your world.</p></section><div class="shop-filter-row"><span>THE COMPLETE COLLECTION / 03</span><span>EAU DE PARFUM · 50 ML</span></div><section class="shop-products section-pad"><div class="products-grid">${fragrances.map(p=>card(p)).join('')}</div></section><section class="shop-visual"><img src="${ASSET}dark-collection-alt.webp" alt="WJ NOIR fragrance collection on glossy black rocks" loading="lazy"/><div class="shop-visual-copy"><span class="eyebrow">A WORLD OF DISTINCTION</span><h2>THE NOIR <em>EDIT.</em></h2></div></section></main>`; }
 function about() { return `<main class="interior-page"><section class="about-hero"><img src="${ASSET}dark-collection-alt.webp" alt="Dramatic WJ NOIR perfume campaign on black rocks in an alpine landscape"/><div class="about-hero-shade"></div><div class="about-hero-content reveal"><span class="eyebrow">THE STORY / WJ NOIR</span><h1>NOT MADE<br/>TO <em>BLEND IN.</em></h1><p>A fragrance house inspired by presence, character and the beautiful art of being remembered.</p></div></section><section class="about-copy section-pad"><div class="eyebrow ink-muted">OUR PHILOSOPHY / 001</div><h2>A scent can say<br/>what words <em>cannot.</em></h2><div class="about-copy-bottom"><p>We believe a fragrance is a deeply personal signature. It can be bold or quiet, warm or refreshing, but it should always feel unmistakably yours.</p><p>From the focused confidence of The Office to the icy allure of Ice Desire and the intimate warmth of Lévoria, our collection celebrates three very different ways to leave an impression.</p></div></section><section class="about-strip"><img loading="lazy" src="${ASSET}dark-collection-alt.webp" alt="Three WJ NOIR perfumes arranged in the mountains"/></section><section class="about-cta section-pad"><span class="eyebrow ink-muted">THE INVITATION</span><h2>DISCOVER YOUR<br/><em>OWN SIGNATURE.</em></h2><a class="button dark-btn" href="#/shop">EXPLORE THE COLLECTION <span>↗</span></a></section></main>`; }
-function product(p) { const related = fragrances.filter(other=>other.id!==p.id); const gallery = p.gallery || [p.image,p.altImage,p.image,p.altImage]; const film = p.video || 'the-office-hero.mp4'; return `<main class="interior-page product-page"><section class="product-detail-layout"><div class="product-gallery-grid" aria-label="${escapeHtml(p.title)} fragrance gallery">${gallery.map((image,index)=>`<figure class="product-gallery-frame"><img src="${ASSET+image}" data-fallback="${ASSET}dark-collection.webp" alt="${escapeHtml(p.galleryAlt?.[index]||`WJ NOIR ${p.title} fragrance photograph ${index+1}`)}" ${index>1?'loading="lazy"':''}/></figure>`).join('')}</div><div class="product-info"><div class="product-overview"><span class="eyebrow ink-muted">${p.category} / WJ NOIR</span><h1>${escapeHtml(p.upper)}</h1><p class="product-summary">${escapeHtml(p.description)}</p><p class="product-signature"><span aria-hidden="true">✦</span> ${escapeHtml(p.tagline)}</p><div class="product-volume"><span>EAU DE PARFUM</span><strong>50 ML</strong></div>${p.showPrice?`<p class="product-detail-price">PKR ${p.price.toLocaleString('en-PK')}</p>`:''}</div><div class="product-purchase"><div class="quantity-label">QUANTITY</div><div class="quantity-control" aria-label="Select quantity"><button type="button" data-quantity-adjust="-1" aria-label="Decrease quantity">−</button><output id="product-quantity" aria-live="polite">1</output><button type="button" data-quantity-adjust="1" aria-label="Increase quantity">+</button></div><button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}">BUY NOW <span>↗</span></button><button type="button" class="purchase-button purchase-secondary" data-add-selection="${p.id}">ADD TO MY SELECTION</button><p class="product-price-note">Online checkout is not connected yet. Buy now saves this fragrance to your personal selection.</p></div><div class="product-accordions"><details class="product-accordion"><summary>Story Behind<span aria-hidden="true"></span></summary><p>${escapeHtml(p.story)}</p></details><details class="product-accordion"><summary>Fragrance Notes<span aria-hidden="true"></span></summary><div class="product-notes">${p.notes.map(n=>`<div><span>${escapeHtml(n.type)}</span><strong>${escapeHtml(n.note)}</strong><small>${escapeHtml(n.description)}</small></div>`).join('')}</div></details></div></div></section><section class="product-film" aria-label="${escapeHtml(p.title)} fragrance film"><video class="product-film-video" autoplay muted loop playsinline preload="metadata" poster="${ASSET}${p.video?'wj-noir-levoria-studio.png':'the-office-poster.jpg'}" aria-label="Cinematic WJ NOIR ${escapeHtml(p.title)} perfume film"><source src="${ASSET+film}" type="video/mp4"/></video></section><section class="related-products section-pad"><div class="section-heading-row"><div><span class="eyebrow ink-muted">CONTINUE EXPLORING</span><h2>YOU MAY ALSO <em>LOVE.</em></h2></div><a class="text-link" href="#/shop">VIEW ALL <span>↗</span></a></div><div class="products-grid related-grid">${related.map(other=>card(other)).join('')}</div></section></main>`; }
+function product(p) {
+  const related = fragrances.filter(other=>other.id!==p.id);
+  const gallery = p.gallery || [p.image,p.altImage,p.image,p.altImage];
+  const film = p.video || 'the-office-hero.mp4';
+  const filmPoster = p.id === 'levoria' ? 'wj-noir-levoria-studio.png' : p.id === 'ice-desire' ? 'wj-noir-ice-desire-studio.png' : 'the-office-poster.jpg';
+  const galleryMarkup = `<div class="product-gallery product-gallery--interactive" aria-label="${escapeHtml(p.title)} fragrance gallery">
+        <div class="product-gallery-track" id="product-gallery-track" aria-label="Swipe through product images">
+          ${gallery.map((image,index)=>`<figure class="product-gallery-slide" data-gallery-slide="${index}"><button type="button" class="product-gallery-zoom-trigger" data-gallery-zoom="${index}" aria-label="Zoom ${escapeHtml(p.title)} image ${index+1}"><img src="${ASSET+image}" data-fallback="${ASSET}dark-collection.webp" alt="${escapeHtml(p.galleryAlt?.[index]||`WJ NOIR ${p.title} fragrance photograph ${index+1}`)}" width="768" height="1024" decoding="async"/></button></figure>`).join('')}
+        </div>
+        <div class="product-gallery-thumbnails" role="group" aria-label="Choose a product image">
+          ${gallery.map((image,index)=>`<button type="button" class="product-gallery-thumbnail${index===0?' is-active':''}" data-gallery-index="${index}" aria-label="Show image ${index+1}" aria-pressed="${index===0}"><img src="${ASSET+image}" alt="" width="72" height="88" loading="eager" decoding="async"/></button>`).join('')}
+        </div>
+        <div class="product-image-zoom" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Zoomed ${escapeHtml(p.title)} product image">
+          <button type="button" class="product-image-zoom-backdrop" data-gallery-zoom-close aria-label="Close zoomed image"></button>
+          <button type="button" class="product-image-zoom-close" data-gallery-zoom-close aria-label="Close zoomed image">×</button>
+          <img class="product-image-zoom-image" alt=""/>
+        </div>
+      </div>`;
+  const infoMarkup = `<div class="product-info product-info--editorial">
+        <div class="product-overview">
+          <span class="eyebrow ink-muted">${p.category} / WJ NOIR</span>
+          <h1>${escapeHtml(p.upper)}</h1>
+          <p class="product-summary">${escapeHtml(p.description)}</p>
+          ${p.showPrice?`<p class="product-detail-price">PKR ${p.price.toLocaleString('en-PK')}</p>`:''}
+          <p class="product-volume product-volume--compact">50 ml <span aria-hidden="true">·</span> Eau de Parfum</p>
+        </div>
+        <div class="product-purchase">
+          <div class="quantity-label">QUANTITY</div>
+          <div class="quantity-control" aria-label="Select quantity">
+            <button type="button" data-quantity-adjust="-1" aria-label="Decrease quantity">−</button>
+            <output id="product-quantity" aria-live="polite">1</output>
+            <button type="button" data-quantity-adjust="1" aria-label="Increase quantity">+</button>
+          </div>
+          <button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}">BUY NOW <span>↗</span></button>
+          <button type="button" class="purchase-button purchase-secondary" data-add-selection="${p.id}">ADD TO MY SELECTION</button>
+          <p class="product-price-note">Online checkout is not connected yet. Buy now saves this fragrance to your personal selection.</p>
+        </div>
+        <div class="product-accordions">
+          <details class="product-accordion"><summary>Story Behind<span aria-hidden="true"></span></summary><p>${escapeHtml(p.story)}</p></details>
+          <details class="product-accordion"><summary>Fragrance Notes<span aria-hidden="true"></span></summary><div class="product-notes">${p.notes.map(n=>`<div><span>${escapeHtml(n.type)}</span><strong>${escapeHtml(n.note)}</strong><small>${escapeHtml(n.description)}</small></div>`).join('')}</div></details>
+        </div>
+      </div>`;
+  const stickyPurchase = `<div class="product-sticky-purchase" aria-hidden="true">
+        <span class="product-sticky-price">PKR ${p.price.toLocaleString('en-PK')}</span>
+        <button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}" tabindex="-1">BUY NOW <span>↗</span></button>
+      </div>`;
+  return `<main class="interior-page product-page product-page--premium"><section class="product-detail-layout">${galleryMarkup}${infoMarkup}</section>${stickyPurchase}<section class="product-film" aria-label="${escapeHtml(p.title)} fragrance film"><video class="product-film-video" autoplay muted loop playsinline preload="metadata" poster="${ASSET+filmPoster}" aria-label="Cinematic WJ NOIR ${escapeHtml(p.title)} perfume film"><source src="${ASSET+film}" type="video/mp4"/></video></section><section class="related-products section-pad"><div class="section-heading-row"><div><span class="eyebrow ink-muted">CONTINUE EXPLORING</span><h2>YOU MAY ALSO <em>LOVE.</em></h2></div><a class="text-link" href="#/shop">VIEW ALL <span>↗</span></a></div><div class="products-grid related-grid">${related.map(other=>card(other)).join('')}</div></section></main>`;
+}
 function notFound(){return `<main class="not-found"><span class="eyebrow">PAGE NOT FOUND</span><h1>Lost your <em>scent?</em></h1><a class="button dark-btn" href="#/">RETURN HOME <span>↗</span></a></main>`;}
 function setupReveals(){const els=document.querySelectorAll('.reveal'); if(reducedMotion || !('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('is-visible'));return;} const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}})},{threshold:.08,rootMargin:'0px 0px -35px 0px'});els.forEach(e=>io.observe(e));}
 function setupVideo(){const video=document.getElementById('hero-video'); if(!video)return; video.muted=true;video.play().catch(()=>{});document.getElementById('sound-toggle')?.addEventListener('click',()=>{video.muted=!video.muted; document.getElementById('sound-caption').textContent=video.muted?'SOUND OFF':'SOUND ON';document.getElementById('sound-symbol').textContent=video.muted?'♫':'♪';document.getElementById('sound-toggle').setAttribute('aria-label',video.muted?'Turn video sound on':'Mute video');});}
-function setupGallery(){document.querySelectorAll('.product-gallery-frame img').forEach(img=>img.addEventListener('error',()=>{if(img.dataset.fallback&&img.getAttribute('src')!==img.dataset.fallback)img.src=img.dataset.fallback;},{once:true}));}
-function setupPurchaseControls(){document.querySelectorAll('[data-quantity-adjust]').forEach(btn=>btn.addEventListener('click',()=>{const output=document.getElementById('product-quantity');const quantity=Number(output.value||output.textContent);output.value=String(Math.max(1,Math.min(99,quantity+Number(btn.dataset.quantityAdjust))));output.textContent=output.value;}));document.querySelectorAll('[data-add-selection],[data-buy-now]').forEach(btn=>btn.addEventListener('click',()=>{const output=document.getElementById('product-quantity');addToSelection(btn.dataset.addSelection||btn.dataset.buyNow,Number(output.value||output.textContent));}));}
+function closeGalleryZoom(){
+  const zoom=document.querySelector('.product-image-zoom');
+  if(!zoom)return;
+  const wasOpen=zoom.classList.contains('is-open');
+  zoom.classList.remove('is-open');
+  zoom.setAttribute('aria-hidden','true');
+  document.body.classList.remove('lock-scroll');
+  if(wasOpen&&zoom.dataset.returnFocus){
+    document.querySelector(`[data-gallery-zoom="${zoom.dataset.returnFocus}"]`)?.focus();
+    delete zoom.dataset.returnFocus;
+  }
+}
+function setupGallery(){
+  document.querySelectorAll('.product-gallery-frame img,.product-gallery-slide img').forEach(img=>img.addEventListener('error',()=>{
+    if(img.dataset.fallback&&img.getAttribute('src')!==img.dataset.fallback)img.src=img.dataset.fallback;
+  },{once:true}));
+  const gallery=document.querySelector('.product-gallery--interactive');
+  if(!gallery)return;
+  const track=gallery.querySelector('.product-gallery-track');
+  const slides=[...gallery.querySelectorAll('.product-gallery-slide')];
+  const thumbnails=[...gallery.querySelectorAll('.product-gallery-thumbnail')];
+  const zoom=gallery.querySelector('.product-image-zoom');
+  const zoomImage=gallery.querySelector('.product-image-zoom-image');
+  let activeIndex=0;
+  let scrollFrame=0;
+  const setActive=(index,scroll=false)=>{
+    activeIndex=Math.max(0,Math.min(slides.length-1,index));
+    thumbnails.forEach((button,i)=>{
+      const active=i===activeIndex;
+      button.classList.toggle('is-active',active);
+      button.setAttribute('aria-pressed',String(active));
+    });
+    if(scroll){
+      track.scrollTo({
+        left:slides[activeIndex].offsetLeft-track.offsetLeft,
+        behavior:reducedMotion?'instant':'smooth'
+      });
+    }
+  };
+  thumbnails.forEach(button=>button.addEventListener('click',()=>setActive(Number(button.dataset.galleryIndex),true)));
+  track.addEventListener('scroll',()=>{
+    cancelAnimationFrame(scrollFrame);
+    scrollFrame=requestAnimationFrame(()=>setActive(Math.round(track.scrollLeft/track.clientWidth)));
+  },{passive:true});
+  gallery.querySelectorAll('[data-gallery-zoom]').forEach(button=>button.addEventListener('click',()=>{
+    const image=slides[Number(button.dataset.galleryZoom)].querySelector('img');
+    zoom.dataset.returnFocus=button.dataset.galleryZoom;
+    zoomImage.src=image.currentSrc||image.src;
+    zoomImage.alt=image.alt;
+    zoom.classList.add('is-open');
+    zoom.setAttribute('aria-hidden','false');
+    document.body.classList.add('lock-scroll');
+    zoom.querySelector('.product-image-zoom-close').focus();
+  }));
+  zoom.querySelectorAll('[data-gallery-zoom-close]').forEach(button=>button.addEventListener('click',closeGalleryZoom));
+}
+function setupStickyPurchase(){
+  if(stickyPurchaseUpdate){
+    window.removeEventListener('scroll',stickyPurchaseUpdate);
+    window.removeEventListener('resize',stickyPurchaseUpdate);
+    stickyPurchaseUpdate=null;
+  }
+  const bar=document.querySelector('.product-sticky-purchase');
+  if(!bar)return;
+  const controls=document.querySelector('.product-purchase');
+  const update=()=>{
+    const controlsPassed=controls.getBoundingClientRect().bottom<=0;
+    const visible=controlsPassed;
+    bar.classList.toggle('is-visible',visible);
+    bar.setAttribute('aria-hidden',String(!visible));
+    bar.querySelector('button').tabIndex=visible?0:-1;
+  };
+  let frame=0;
+  stickyPurchaseUpdate=()=>{
+    cancelAnimationFrame(frame);
+    frame=requestAnimationFrame(update);
+  };
+  window.addEventListener('scroll',stickyPurchaseUpdate,{passive:true});
+  window.addEventListener('resize',stickyPurchaseUpdate);
+  update();
+}
+function setupPurchaseControls(){
+  document.querySelectorAll('[data-quantity-adjust]').forEach(btn=>btn.addEventListener('click',()=>{
+    const output=document.getElementById('product-quantity');
+    const quantity=Number(output.value||output.textContent);
+    output.value=String(Math.max(1,Math.min(99,quantity+Number(btn.dataset.quantityAdjust))));
+    output.textContent=output.value;
+  }));
+  document.querySelectorAll('[data-add-selection],[data-buy-now]').forEach(btn=>btn.addEventListener('click',()=>{
+    const output=document.getElementById('product-quantity');
+    addToSelection(btn.dataset.addSelection||btn.dataset.buyNow,Number(output.value||output.textContent));
+  }));
+  setupStickyPurchase();
+}
 function route(){const path=(window.location.hash||'#/').slice(1).split('?')[0]; const p=path.startsWith('/fragrance/')?fragrances.find(x=>x.id===path.split('/')[2]):undefined;document.body.classList.toggle('home-route',path==='/');app.innerHTML=path==='/'?home():path==='/shop'?shop():path==='/about'?about():p?product(p):notFound();document.title=(p?p.title+' — ':path==='/shop'?'The Collection — ':path==='/about'?'Our Story — ':'')+'WJ NOIR';window.scrollTo({top:0,behavior:'instant'}); setupReveals();setupVideo();setupGallery();setupPurchaseControls();document.querySelectorAll('[data-add]').forEach(btn=>btn.addEventListener('click',()=>addToSelection(btn.dataset.add)));closeAll();}
-function closeAll(){document.querySelectorAll('.overlay').forEach(el=>{el.classList.remove('open');el.setAttribute('aria-hidden','true');});document.body.classList.remove('lock-scroll');document.getElementById('menu-toggle').setAttribute('aria-expanded','false');}
+function closeAll(){document.querySelectorAll('.overlay').forEach(el=>{el.classList.remove('open');el.setAttribute('aria-hidden','true');});closeGalleryZoom();document.body.classList.remove('lock-scroll');document.getElementById('menu-toggle').setAttribute('aria-expanded','false');}
 function toggleOverlay(type){const layer=document.getElementById(`${type}-overlay`);const was=layer.classList.contains('open');closeAll();if(!was){layer.classList.add('open');layer.setAttribute('aria-hidden','false');document.body.classList.add('lock-scroll');if(type==='menu')document.getElementById('menu-toggle').setAttribute('aria-expanded','true');if(type==='search'){renderSearch();setTimeout(()=>document.getElementById('search-input').focus(),50);}}}
 function addToSelection(id,quantity=1){if(!selected.includes(id))selected.push(id);selectionQuantities[id]=(selectionQuantities[id]||0)+quantity;saveSelected();toggleOverlay('bag');}
 function adjustSelectionQuantity(id,change){selectionQuantities[id]=Math.max(1,(selectionQuantities[id]||1)+change);saveSelected();}
@@ -48,7 +188,7 @@ document.getElementById('search-toggle').addEventListener('click',()=>toggleOver
 document.getElementById('bag-toggle').addEventListener('click',()=>toggleOverlay('bag'));
 document.getElementById('search-input').addEventListener('input',renderSearch);
 document.addEventListener('click',e=>{const closest=e.target.closest('[data-close]');if(closest)closeAll();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.querySelector('.product-image-zoom.is-open'))closeGalleryZoom();else closeAll();}});
 document.getElementById('copy-selection').addEventListener('click',async()=>{const names=selected.map(id=>({title:fragrances.find(p=>p.id===id)?.title,quantity:selectionQuantities[id]||1})).filter(entry=>entry.title);const value='My WJ NOIR fragrance selection:\n'+names.map(entry=>'• '+entry.title+' (50 ML) × '+entry.quantity).join('\n');try{await navigator.clipboard.writeText(value);document.getElementById('copy-feedback').textContent='Your selection has been copied.';}catch{document.getElementById('copy-feedback').textContent='Copy unavailable in this browser.';}});
 document.getElementById('newsletter-form').addEventListener('submit',e=>{e.preventDefault();document.getElementById('newsletter-message').textContent='Preview only: connect your newsletter provider before launch.';});
 document.getElementById('year').textContent=new Date().getFullYear();
