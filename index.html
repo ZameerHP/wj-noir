@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#11110f" />
+  <meta name="description" content="WJ NOIR — The Office, Ice Desire and Lévoria. Three distinct signatures. One fragrance house." />
+  <meta property="og:title" content="WJ NOIR — Wear your presence" />
+  <meta property="og:description" content="Three distinct fragrances. Discover your signature." />
+  <meta property="og:image" content="/assets/dark-collection.webp" />
+  <link rel="icon" href="/assets/wj-noir-logo.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Sans:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css?v=26" />
+  <title>WJ NOIR — Fragrance House</title>
+</head>
+<body>
+  <div class="loading-screen" id="loading-screen" aria-hidden="true"><img class="loading-brand-logo" src="/assets/wj-noir-logo.png" alt="" /><div class="loading-rule"><span></span></div></div>
+  <header class="site-header" id="site-header">
+    <button class="icon-button menu-button" id="menu-toggle" aria-label="Open navigation" aria-expanded="false"><span class="hamburger"><i></i><i></i></span><span class="menu-label">MENU</span></button>
+    <a class="brand" href="#/" aria-label="WJ Noir, go to homepage"><img class="brand-logo" src="/assets/wj-noir-logo.png" alt="" /></a>
+    <div class="header-right"><button class="icon-button" id="search-toggle" aria-label="Search fragrances"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 5 5"/></svg></button><button class="icon-button bag-button" id="bag-toggle" aria-label="Open your selection"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 8h16l-1.5 13h-13L4 8Z"/><path d="M8.5 9V6a3.5 3.5 0 0 1 7 0v3"/></svg><span id="bag-count" class="bag-count" hidden>0</span></button></div>
+  </header>
+  <div class="route-content" id="app"></div>
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-heading">NAVIGATION</div>
+        <a href="#/">Home <span>↗</span></a>
+        <a href="#/about">Our story <span>↗</span></a>
+        <a href="#/shop">The collection <span>↗</span></a>
+      </div>
+      <div>
+        <div class="footer-heading">SIGNATURES</div>
+        <a href="#/fragrance/the-office">The Office <span>↗</span></a>
+        <a href="#/fragrance/ice-desire">Ice Desire <span>↗</span></a>
+        <a href="#/fragrance/levoria">Lévoria <span>↗</span></a>
+      </div>
+      <div class="footer-news">
+        <div class="footer-heading">THE PRIVATE LIST</div>
+        <p>New fragrances, house stories and private previews.</p>
+        <form id="newsletter-form" class="newsletter-form">
+          <label class="sr-only" for="newsletter-email">Your email</label>
+          <input type="email" id="newsletter-email" required placeholder="Your email address" autocomplete="email"/>
+          <button aria-label="Subscribe to the private list">SUBSCRIBE</button>
+        </form>
+        <p id="newsletter-message" class="newsletter-message" aria-live="polite"></p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <img class="footer-brand-logo" src="/assets/wj-noir-logo.png" alt="WJ NOIR"/>
+      <span>© <span id="year"></span> WJ NOIR. ALL RIGHTS RESERVED.</span>
+      <a href="#/" aria-label="Back to top">BACK TO TOP ↑</a>
+    </div>
+  </footer>
+  <div class="overlay" id="menu-overlay" aria-hidden="true"><div class="overlay-backdrop" data-close="menu"></div><nav class="nav-panel" aria-label="Primary navigation"><div class="panel-top"><span>THE HOUSE OF WJ NOIR</span><button class="close-btn" data-close="menu" aria-label="Close menu">×</button></div><div class="nav-links"><a href="#/" data-close="menu"><small>01 /</small>HOME <span>↗</span></a><a href="#/shop" data-close="menu"><small>02 /</small>THE COLLECTION <span>↗</span></a><a href="#/about" data-close="menu"><small>03 /</small>OUR STORY <span>↗</span></a></div><div class="panel-bottom">THREE WORLDS. ONE UNMISTAKABLE PRESENCE.</div></nav></div>
+  <div class="overlay" id="search-overlay" aria-hidden="true"><div class="overlay-backdrop" data-close="search"></div><div class="side-panel search-panel"><div class="panel-top"><span>FIND YOUR SIGNATURE</span><button class="close-btn" data-close="search" aria-label="Close search">×</button></div><label class="sr-only" for="search-input">Search fragrances</label><input class="search-input" id="search-input" placeholder="Search fragrances or notes..." autocomplete="off"/><div class="search-results" id="search-results"></div></div></div>
+  <div class="overlay" id="bag-overlay" aria-hidden="true"><div class="overlay-backdrop" data-close="bag"></div><aside class="side-panel bag-panel" aria-label="Your fragrance selection"><div class="panel-top"><span>YOUR SELECTION <span id="bag-heading-count">(0)</span></span><button class="close-btn" data-close="bag" aria-label="Close selection">×</button></div><div class="bag-list" id="bag-list"></div><div class="bag-bottom"><p>Your selection is a personal shortlist. Prices, inventory and online checkout are not connected yet.</p><button id="copy-selection" class="button dark-btn" disabled>COPY MY SELECTION <span>↗</span></button><span id="copy-feedback" class="copy-feedback" aria-live="polite"></span></div></aside></div>
+  <script type="module" src="/app.js?v=21"></script>
+</body>
+</html>
