@@ -792,3 +792,69 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
   .hero-heading{font-size:clamp(42px,10.8vw,54px)}
   .hero-actions .button{font-size:7px}
 }
+
+.menu-overlay .overlay-backdrop{display:block}
+.menu-overlay .menu-panel{
+  width:min(440px,100%);
+  height:100%;
+  padding:clamp(28px,5vw,48px);
+  overflow:hidden;
+  background:#f5f4f0;
+  color:var(--ink);
+  transform:translateX(100%);
+  transition:transform .46s cubic-bezier(.2,.8,.2,1);
+}
+.menu-overlay.open .menu-panel{transform:translateX(0)}
+.menu-drawer-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding-bottom:24px;
+  border-bottom:1px solid #d9d7d0;
+  color:#5e5d56;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.18em;
+}
+.menu-drawer-header i{padding:0 7px;color:var(--gold);font-style:normal}
+.menu-drawer-header .close-btn{color:var(--ink)}
+.menu-navigation-links{display:flex;flex-direction:column;gap:0;margin:34px 0 38px}
+.menu-navigation-links a{
+  display:flex;
+  align-items:center;
+  min-height:58px;
+  border-bottom:1px solid #dedcd5;
+  color:var(--ink);
+  font-family:var(--serif);
+  font-size:clamp(23px,2.5vw,30px);
+  font-weight:400;
+  letter-spacing:-.025em;
+  transition:color .2s,padding .25s;
+}
+.menu-navigation-links a:hover{padding-left:5px;color:#9b8060}
+.menu-scents{
+  display:flex;
+  flex-direction:column;
+  margin-top:auto;
+  border-top:1px solid #d9d7d0;
+}
+.menu-section-label{margin:24px 0 9px;color:#85837a;font-size:9px;font-weight:700;letter-spacing:.17em}
+.menu-scent{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  min-height:56px;
+  border-bottom:1px solid #dedcd5;
+  color:#34342f;
+  font-size:14px;
+  transition:color .2s,padding .25s;
+}
+.menu-scent>span:first-child{color:#98958c;font-size:9px;letter-spacing:.08em}
+.menu-scent>span:last-child{margin-left:auto;color:#85837a;font-size:16px}
+.menu-scent:hover{padding-left:5px;color:#9b8060}
+@media(max-height:600px){
+  .menu-navigation-links{margin:18px 0}
+  .menu-navigation-links a{min-height:48px}
+  .menu-section-label{margin-top:14px}
+  .menu-scent{min-height:46px}
+}
