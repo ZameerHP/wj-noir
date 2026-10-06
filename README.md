@@ -22,12 +22,13 @@ Import this folder as a new Vercel project. Set **Framework Preset: Other**, lea
 * `assets/the-office-hero.mp4` is the **same video**, with only the black bars baked into the portrait upload removed. It is encoded in H.264 for browser compatibility at the original 24 fps, original length and normal playback speed. Its scenes and animation have **not** been regenerated.
 * `assets/the-office-poster.jpg` is a real frame extracted from your video, so the hero still looks correct while it loads.
 
-Video autoplays **muted** because browsers block unmuted autoplay. Visitors can use the sound toggle if their browser supports audio. The video automatically loops.
+Video autoplays **muted** on standard connections because browsers block unmuted autoplay. There is no sound toggle. It stays paused when reduced motion or data saver is enabled, and automatically loops when playing.
 
 ## Included pages and interactions
 
 - Homepage: full-screen The Office video campaign with an overlay navigation, editorial headline and collection calls to action, followed by the manifesto, a three-card "Most Wanted" section featuring the supplied The Office, Ice Desire and Lévoria product photographs, dark-rock collection banner, editorial sections, brand statement and footer.
 - The supplied WJ NOIR logo artwork is used in the site header, loading screen, footer and favicon, with its background made transparent for clean placement.
+- Product photos use compressed JPEG versions that are about 90% smaller than the original PNGs. Supporting imagery loads lazily, and product films wait until they are near the viewport.
 - Collection (`#/shop`): all three fragrances.
 - Brand story (`#/about`).
 - Separate fragrance pages (`#/fragrance/the-office`, `#/fragrance/ice-desire`, `#/fragrance/levoria`) with four-image galleries; The Office and Ice Desire each use their original product image plus three supplied photos. Pages also include a short looping fragrance film, quantity-aware cart controls, and expandable fragrance stories and notes.
