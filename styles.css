@@ -1121,8 +1121,6 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
 .bag-panel .bag-list{flex:1;overflow:auto}
 .cart-toast{position:fixed;z-index:500;right:24px;bottom:24px;max-width:calc(100vw - 48px);padding:14px 20px;background:#1b3a2d;color:#fff;font-size:11px;letter-spacing:.08em;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .2s ease,transform .2s ease}
 .cart-toast.is-visible{opacity:1;transform:translateY(0)}
-.admin-access-dot{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border:1px solid rgba(255,255,255,.24);color:#aaa99f!important;opacity:1!important;font-size:9px!important;font-weight:700;letter-spacing:.13em;transition:color .2s,border-color .2s,background .2s}
-.admin-access-dot:hover,.admin-access-dot:focus-visible{border-color:#c9c2b4;background:rgba(255,255,255,.06);color:#f4f1e9!important;opacity:1!important}
 @media(max-width:760px){
   .commerce-page{padding:44px 20px 60px}
   .checkout-layout{grid-template-columns:1fr;gap:22px}

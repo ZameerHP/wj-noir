@@ -37,7 +37,7 @@ Video autoplays **muted** because browsers block unmuted autoplay. Visitors can 
 
 ## Ordering system setup
 
-The storefront includes a local-storage cart, quantity controls, Buy Now checkout, validated Cash on Delivery form, order confirmation, and an admin orders dashboard. Supabase is the source of truth for accepted orders and prices. The order-creation RPC accepts only the three catalog products and calculates prices on the database; the browser cannot read customer orders. This project does not collect online card payments or calculate shipping.
+The storefront includes a local-storage cart, quantity controls, Buy Now checkout, validated Cash on Delivery form, order confirmation, and an admin orders dashboard. Open the admin sign-in by clicking the footer logo five times within two seconds; authorized admin sign-in is still required. Supabase is the source of truth for accepted orders and prices. The order-creation RPC accepts only the three catalog products and calculates prices on the database; the browser cannot read customer orders. This project does not collect online card payments or calculate shipping.
 
 ### 1. Create and configure Supabase
 

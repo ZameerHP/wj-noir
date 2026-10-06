@@ -27,6 +27,8 @@ let adminChannel=null;
 let adminOrders=[];
 let selectedAdminOrderId=null;
 let checkoutSubmitting=false;
+let adminTriggerClicks=0;
+let adminTriggerTimeout;
 const cartQuantity = () => cart.reduce((total,item)=>total+item.quantity,0);
 const cartSubtotal = items => items.reduce((total,item)=>total+(fragrances.find(p=>p.id===item.id)?.price||0)*item.quantity,0);
 function saveCart(){
@@ -454,6 +456,18 @@ function renderAdminOrders(){
 }
 function setupGlobalCommerceActions(){
   document.addEventListener('click',event=>{
+    const adminTrigger=event.target.closest('[data-admin-trigger]');
+    if(adminTrigger){
+      adminTriggerClicks+=1;
+      clearTimeout(adminTriggerTimeout);
+      if(adminTriggerClicks===5){
+        adminTriggerClicks=0;
+        navigateTo('/admin');
+      }else{
+        adminTriggerTimeout=setTimeout(()=>{adminTriggerClicks=0;},2000);
+      }
+      return;
+    }
     const adjust=event.target.closest('[data-cart-adjust]');
     if(adjust){adjustCartQuantity(adjust.dataset.cartId,Number(adjust.dataset.cartAdjust));return;}
     const remove=event.target.closest('[data-cart-remove]');
@@ -465,8 +479,6 @@ function setupGlobalCommerceActions(){
       sessionStorage.setItem('wj-noir-checkout-from-cart','true');
       closeAll();navigateTo('/checkout');return;
     }
-    const adminLink=event.target.closest('[data-admin-route]');
-    if(adminLink){event.preventDefault();navigateTo('/admin');return;}
   });
 }
 function renderSearch(){const q=document.getElementById('search-input').value.trim().toLowerCase();const results=fragrances.filter(p=>!q||[p.title,p.category,p.tagline,...p.tones,...p.notes.map(n=>n.note)].join(' ').toLowerCase().includes(q));document.getElementById('search-results').innerHTML=results.length?results.map(p=>`<a class="search-result" href="#/fragrance/${p.id}" data-close="search"><img src="${ASSET+p.image}" alt=""/><span><small>${p.category} · EAU DE PARFUM</small><strong>${p.title}</strong><small>${p.tones.join(' / ')}</small></span><i>↗</i></a>`).join(''):`<div class="search-empty">No fragrance matched your search. Try “woody”, “ice” or “vanilla”.</div>`;}
