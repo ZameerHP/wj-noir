@@ -1110,6 +1110,10 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
 .admin-detail-item{display:flex;justify-content:space-between;gap:15px;padding:10px 0;border-bottom:1px solid #e5e3dc}
 .admin-status-control{display:flex;align-items:center;gap:12px;font-weight:700}
 .admin-status-control select{min-height:38px;padding:7px 10px;border:1px solid #d7d5cd;background:#fff}
+.admin-order-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px}
+.admin-delete-order{min-height:38px;padding:8px 12px;border:1px solid #a54139;background:transparent;color:#8e2d27;font-size:9px;font-weight:700;letter-spacing:.1em;cursor:pointer;transition:background .2s ease,color .2s ease,border-color .2s ease}
+.admin-delete-order:hover{background:#8e2d27;color:#fff;border-color:#8e2d27}
+.admin-delete-order:disabled{cursor:wait;opacity:.5}
 .admin-empty{padding:28px;border:1px solid #dedcd4;background:#faf9f6}
 .admin-login{width:min(100%,490px);margin:0 auto}
 .admin-login>p{margin-bottom:30px}
@@ -1168,4 +1172,11 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
   .admin-heading{align-items:flex-start;flex-direction:column}
   .admin-heading-actions{width:100%;justify-content:stretch}
   .admin-heading-actions button{flex:1}
+}
+
+@media(max-width:620px){
+  .admin-order-actions{align-items:stretch;flex-direction:column}
+  .admin-status-control{justify-content:space-between}
+  .admin-status-control select{flex:1}
+  .admin-delete-order{width:100%}
 }
