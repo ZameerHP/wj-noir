@@ -45,9 +45,25 @@ module.exports = async (request, response) => {
     if (!userResponse.ok) return json(response, 401, { error: 'Your admin session is invalid or expired.' });
 
     const user = await userResponse.json();
-    if (!user?.email || user.email.toLowerCase() !== adminEmail.toLowerCase()) {
-      return json(response, 403, { error: 'This account is not allowed to send order emails.' });
+    if (!user?.email) return json(response, 401, { error: 'Your admin session could not be verified.' });
+
+    // Check the same Supabase allowlist used by the admin dashboard instead of
+    // relying on a possibly different Vercel ADMIN_EMAIL value.
+    const adminCheckResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/is_order_admin`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    });
+    if (!adminCheckResponse.ok) {
+      console.error('Admin allowlist check failed.', adminCheckResponse.status, await adminCheckResponse.text());
+      return json(response, 403, { error: 'Could not verify admin permission. Please sign in again.' });
     }
+    const isAdmin = await adminCheckResponse.json();
+    if (isAdmin !== true) return json(response, 403, { error: 'This account is not allowed to send order emails.' });
 
     const { orderId, status } = request.body || {};
     if (typeof orderId !== 'string' || !/^[0-9a-f-]{36}$/i.test(orderId) || !ALLOWED_STATUSES.has(status)) {
@@ -139,6 +155,10 @@ module.exports = async (request, response) => {
       </body>
       </html>`;
 
+    const normalizedFrom = /<[^<>\s]+@[^<>\s]+>|^[^\s<>]+@[^\s<>]+$/.test(fromEmail.trim())
+      ? fromEmail.trim()
+      : 'WJ NOIR <orders@wjnoir.store>';
+
     const resendResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -146,17 +166,22 @@ module.exports = async (request, response) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: fromEmail,
+        from: normalizedFrom,
         to: [order.email],
+        reply_to: adminEmail,
         subject: statusCopy.subject,
         html,
       }),
     });
 
     if (!resendResponse.ok) {
-      const details = (await resendResponse.text()).slice(0, 700);
-      console.error('Resend rejected order status email.', resendResponse.status, details);
-      return json(response, 502, { error: `Resend could not send the customer email (${resendResponse.status}). Check FROM_EMAIL domain verification and Resend logs.` });
+      const resendError = await resendResponse.json().catch(async () => ({ message: (await resendResponse.text()).slice(0, 500) }));
+      const reason = String(resendError?.message || resendError?.name || 'Resend rejected the email.').replace(/\s+/g, ' ').trim();
+      console.error('Resend rejected order status email.', resendResponse.status, reason);
+      return json(response, 502, {
+        error: `Resend error ${resendResponse.status}: ${reason}`,
+        stage: 'resend'
+      });
     }
 
     const resendResult = await resendResponse.json().catch(() => ({}));
