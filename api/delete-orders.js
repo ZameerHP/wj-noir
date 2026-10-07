@@ -50,8 +50,11 @@ module.exports = async (request, response) => {
     const isAdmin = await adminCheckResponse.json();
     if (isAdmin !== true) return json(response, 403, { error: 'This account is not allowed to delete orders.' });
 
-    if (request.body?.confirmation !== 'DELETE ALL') {
-      return json(response, 400, { error: 'Deletion confirmation is missing.' });
+    const orderId = typeof request.body?.orderId === 'string' ? request.body.orderId.trim() : '';
+    const deleteAll = request.body?.confirmation === 'DELETE ALL';
+
+    if (!deleteAll && !/^[0-9a-f-]{36}$/i.test(orderId)) {
+      return json(response, 400, { error: 'A valid order ID is required.' });
     }
 
     const serviceHeaders = {
@@ -63,19 +66,29 @@ module.exports = async (request, response) => {
       serviceHeaders.Authorization = `Bearer ${serviceRoleKey}`;
     }
 
-    const deleteResponse = await fetch(`${supabaseUrl}/rest/v1/orders?id=not.is.null`, {
+    const deleteUrl = deleteAll
+      ? `${supabaseUrl}/rest/v1/orders?id=not.is.null`
+      : `${supabaseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(orderId)}`;
+
+    const deleteResponse = await fetch(deleteUrl, {
       method: 'DELETE',
       headers: serviceHeaders,
     });
 
     if (!deleteResponse.ok) {
       const details = (await deleteResponse.text()).slice(0, 800);
-      console.error('Supabase rejected delete-all-orders.', deleteResponse.status, details);
+      console.error('Supabase rejected order deletion.', deleteResponse.status, details);
       return json(response, 502, { error: 'Database rejected the delete request.' });
     }
 
     const deletedRows = await deleteResponse.json().catch(() => []);
-    return json(response, 200, { deleted: Array.isArray(deletedRows) ? deletedRows.length : 0 });
+    const deleted = Array.isArray(deletedRows) ? deletedRows.length : 0;
+
+    if (!deleteAll && deleted === 0) {
+      return json(response, 404, { error: 'Order was not found or was already deleted.' });
+    }
+
+    return json(response, 200, { deleted, orderId: deleteAll ? null : orderId });
   } catch (error) {
     console.error('Delete all orders failed.', error);
     return json(response, 500, { error: 'Delete all orders failed unexpectedly.' });
