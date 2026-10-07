@@ -1,0 +1,101 @@
+name: Build real WJ favicon
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/wj-noir-logo.png"
+      - ".github/workflows/build-real-favicon.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pillow
+        run: python -m pip install --quiet pillow
+
+      - name: Build favicons from the real WJ Noir logo
+        run: |
+          python - <<'PY'
+          from PIL import Image
+
+          src = Image.open("assets/wj-noir-logo.png").convert("RGBA")
+
+          def build(size):
+              canvas = Image.new("RGBA", (size, size), (8, 8, 8, 255))
+              max_w = int(size * 0.90)
+              max_h = int(size * 0.90)
+              scale = min(max_w / src.width, max_h / src.height)
+              w = max(1, round(src.width * scale))
+              h = max(1, round(src.height * scale))
+              logo = src.resize((w, h), Image.Resampling.LANCZOS)
+              canvas.alpha_composite(logo, ((size - w)//2, (size - h)//2))
+              return canvas.convert("RGB")
+
+          build(48).save("favicon-wj-48.png", optimize=True)
+          build(192).save("favicon-wj-192.png", optimize=True)
+          build(512).save("favicon-wj-512.png", optimize=True)
+
+          ico = build(256)
+          ico.save("favicon.ico", format="ICO", sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+          PY
+
+      - name: Point indexed pages to the real logo favicon
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, json
+
+          pages = [
+              Path("index.html"),
+              Path("shop.html"),
+              Path("about.html"),
+              Path("fragrance/the-office.html"),
+              Path("fragrance/ice-desire.html"),
+              Path("fragrance/levoria.html"),
+          ]
+
+          block = """  <link rel="icon" href="/favicon-wj-48.png" type="image/png" sizes="48x48" />
+            <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+            <link rel="apple-touch-icon" href="/favicon-wj-192.png" sizes="192x192" />
+            <link rel="manifest" href="/site.webmanifest" />"""
+
+          for page in pages:
+              text = page.read_text(encoding="utf-8")
+              text = re.sub(r'\s*<link rel="icon"[^>]*>\s*', '\n', text, flags=re.I)
+              text = re.sub(r'\s*<link rel="shortcut icon"[^>]*>\s*', '\n', text, flags=re.I)
+              text = re.sub(r'\s*<link rel="apple-touch-icon"[^>]*>\s*', '\n', text, flags=re.I)
+              text = re.sub(r'\s*<link rel="manifest"[^>]*>\s*', '\n', text, flags=re.I)
+              text = re.sub(r'(<meta name="theme-color"[^>]*>\s*)', r'\1\n' + block + '\n', text, count=1, flags=re.I)
+              page.write_text(text, encoding="utf-8")
+
+          manifest = {
+              "name": "WJ NOIR",
+              "short_name": "WJ NOIR",
+              "icons": [
+                  {"src": "/favicon-wj-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": "/favicon-wj-512.png", "sizes": "512x512", "type": "image/png"}
+              ],
+              "theme_color": "#080808",
+              "background_color": "#080808",
+              "display": "standalone"
+          }
+          Path("site.webmanifest").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Commit generated favicon files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add favicon.ico favicon-wj-48.png favicon-wj-192.png favicon-wj-512.png site.webmanifest index.html shop.html about.html fragrance/the-office.html fragrance/ice-desire.html fragrance/levoria.html
+          if git diff --cached --quiet; then
+            echo "No favicon changes"
+          else
+            git commit -m "Generate favicons from exact WJ Noir logo"
+            git push
+          fi
