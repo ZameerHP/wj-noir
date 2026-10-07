@@ -133,9 +133,9 @@ begin
 
   with catalog(product_id, product_name, product_image, unit_price) as (
     values
-      ('the-office', 'The Office', 'assets/wj-noir-the-office.png', 3000::numeric),
-      ('ice-desire', 'Ice Desire', 'assets/wj-noir-ice-desire.png', 2500::numeric),
-      ('levoria', 'Lévoria', 'assets/wj-noir-levoria.png', 2500::numeric)
+      ('the-office', 'The Office', 'assets/wj-noir-the-office.png', 2999::numeric),
+      ('ice-desire', 'Ice Desire', 'assets/wj-noir-ice-desire.png', 2499::numeric),
+      ('levoria', 'Lévoria', 'assets/wj-noir-levoria.png', 2499::numeric)
   )
   select count(*), sum(catalog.unit_price * requested.quantity)
   into v_valid_count, v_total
@@ -159,9 +159,9 @@ begin
 
   with catalog(product_id, product_name, product_image, unit_price) as (
     values
-      ('the-office', 'The Office', 'assets/wj-noir-the-office.png', 3000::numeric),
-      ('ice-desire', 'Ice Desire', 'assets/wj-noir-ice-desire.png', 2500::numeric),
-      ('levoria', 'Lévoria', 'assets/wj-noir-levoria.png', 2500::numeric)
+      ('the-office', 'The Office', 'assets/wj-noir-the-office.png', 2999::numeric),
+      ('ice-desire', 'Ice Desire', 'assets/wj-noir-ice-desire.png', 2499::numeric),
+      ('levoria', 'Lévoria', 'assets/wj-noir-levoria.png', 2499::numeric)
   )
   insert into public.order_items (order_id, product_name, product_image, size_ml, quantity, unit_price)
   select v_order.id, catalog.product_name, catalog.product_image, 50, requested.quantity, catalog.unit_price
