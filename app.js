@@ -38,19 +38,19 @@ function saveCart(){
 }
 const arrow = `<span class="arrow-icon" aria-hidden="true">↗</span>`;
 const buttonLink = (href, title, variant='light') => `<a class="button ${variant === 'light' ? 'light-btn' : 'outline-btn'}" href="${href}"><span>${title}</span>${arrow}</a>`;
-function card(p, extra='', reveal=true) { return `<article class="product-card ${extra} ${reveal?'reveal':''}"><a class="product-image-wrap" href="#/fragrance/${p.id}" aria-label="Discover ${escapeHtml(p.title)}"><img loading="lazy" decoding="async" src="${ASSET+p.image}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/><span class="product-hover">DISCOVER FRAGRANCE ↗</span><span class="product-number">${p.number} / 03</span></a><div class="product-card-info"><div><span class="eyebrow">${p.category} · EAU DE PARFUM</span><h3>${escapeHtml(p.title)}</h3><p>${p.tagline}</p>${p.showPrice?`<p class="product-card-price">PKR ${p.price.toLocaleString('en-PK')}</p>`:''}</div><a class="round-arrow" aria-label="View ${escapeHtml(p.title)}" href="#/fragrance/${p.id}">↗</a></div></article>`; }
+function card(p, extra='', reveal=true) { return `<article class="product-card ${extra} ${reveal?'reveal':''}"><a class="product-image-wrap" href="/fragrance/${p.id}" aria-label="Discover ${escapeHtml(p.title)}"><img loading="lazy" decoding="async" src="${ASSET+p.image}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/><span class="product-hover">DISCOVER FRAGRANCE ↗</span><span class="product-number">${p.number} / 03</span></a><div class="product-card-info"><div><span class="eyebrow">${p.category} · EAU DE PARFUM</span><h3>${escapeHtml(p.title)}</h3><p>${p.tagline}</p>${p.showPrice?`<p class="product-card-price">PKR ${p.price.toLocaleString('en-PK')}</p>`:''}</div><a class="round-arrow" aria-label="View ${escapeHtml(p.title)}" href="/fragrance/${p.id}">↗</a></div></article>`; }
 function home() { return `
   <main>
-    <section class="hero" id="hero" aria-label="WJ NOIR fragrance film campaign"><div class="hero-video-wrap"><video id="hero-video" class="hero-video" muted loop playsinline preload="none" poster="${ASSET}the-office-poster.jpg"><source src="${ASSET}the-office-hero.mp4" type="video/mp4"/></video></div><div class="hero-shade"></div><div class="hero-noise"></div><div class="hero-top-copy"><p class="hero-intro animate-in">For those who choose their own way.<br/>Your presence. Your signature. Your rules.</p></div><div class="hero-proof animate-in" aria-label="Three signature fragrances"><div class="hero-fragrance-orbit"><img src="${ASSET}wj-noir-the-office.jpg" alt="" decoding="async" fetchpriority="low"/><img src="${ASSET}wj-noir-ice-desire.jpg" alt="" decoding="async" fetchpriority="low"/><img src="${ASSET}wj-noir-levoria.jpg" alt="" decoding="async" fetchpriority="low"/></div><p>THREE SIGNATURES.<br/>ONE UNMISTAKABLE PRESENCE.</p></div><div class="hero-content"><p class="eyebrow hero-kicker animate-in"><span class="line-accent"></span>THE WORLD OF WJ NOIR <span class="kicker-index">— 001</span></p><h1 class="animate-in hero-heading">WEAR YOUR<br/><em>PRESENCE.</em></h1><p class="hero-description animate-in">An entrance you feel.<br/>An impression that stays.</p></div><div class="hero-actions animate-in">${buttonLink('#/about','DISCOVER THE HOUSE','outline')}${buttonLink('#/shop','SHOP THE COLLECTION')}</div><div class="hero-bottom"><span class="hero-scroll">SCROLL TO DISCOVER <span class="scroll-line"></span></span><span>01 / 03 — THE SIGNATURE COLLECTION</span><span class="hero-video-mark">FILM 001&nbsp; ↗</span></div></section>
-    <section class="about-intro section-pad" id="story"><span class="eyebrow ink-muted">THE HOUSE OF WJ NOIR</span><p>We create fragrances for those who choose their own way. Each scent is thoughtfully composed to express individuality, leave a lasting impression, and feel unmistakably yours.</p><a class="about-intro-link" href="#/about">OUR STORY <span>↗</span></a></section>
-    <section class="products-section most-wanted-section" id="collection"><div class="section-heading-row reveal"><div><span class="eyebrow ink-muted">THE WJ NOIR COLLECTION</span><h2>MOST WANTED</h2></div><a class="most-wanted-explore" href="#/shop">EXPLORE ALL <span>↗</span></a></div><div class="products-grid">${fragrances.map(p=>card(p,'most-wanted-card')).join('')}</div><div class="under-products reveal"><span>THREE DISTINCT WORLDS. ONE UNMISTAKABLE PRESENCE.</span><span>50 ML / EAU DE PARFUM</span></div></section>
-    <section class="collection-banner" id="after-hours"><div class="collection-bg"><img loading="lazy" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR three perfumes on dark wet volcanic rocks and water"/></div><div class="collection-gradient"></div><div class="collection-copy reveal"><div class="eyebrow light-muted"><span class="line-accent"></span>THE COLLECTION / NO. 01</div><h2>AFTER<br/><em>HOURS.</em></h2><p>Dark. Distinct. Uncompromising.<br/>A signature that refuses to go unnoticed.</p>${buttonLink('#/shop','EXPLORE COLLECTION')}</div><div class="banner-footnote">THE NOIR EDIT&nbsp; / &nbsp;WJ FRAGRANCE HOUSE</div></section>
-    <section class="editorial-section" id="universes"><div class="editorial-heading section-pad reveal"><span class="eyebrow ink-muted">BEYOND THE ORDINARY / 002</span><h2>Three scents.<br/><em>Infinite expression.</em></h2><p>Every signature has its own world. Find the one that feels like yours.</p></div><div class="editorial-grid"><a href="#/fragrance/ice-desire" class="editorial-card cold reveal"><div class="editorial-photo"><img loading="lazy" decoding="async" src="${ASSET}wj-noir-ice-desire-water.jpg" alt="Ice Desire perfume among snow, mountains and icy reflective water"/></div><div class="editorial-copy"><span>01 / FRESH. REFINED. UNTOUCHED.</span><div><h3>ICE <em>DESIRE.</em></h3><span class="editorial-arrow">↗</span></div></div></a><a href="#/fragrance/levoria" class="editorial-card warm reveal"><div class="editorial-photo"><img loading="lazy" decoding="async" src="${ASSET}wj-noir-levoria.jpg" alt="Lévoria deep burgundy perfume with vanilla blossoms and warm sunlight"/></div><div class="editorial-copy"><span>02 / SOFT. GOLDEN. UNFORGETTABLE.</span><div><h3><em>LÉVORIA.</em></h3><span class="editorial-arrow">↗</span></div></div></a></div></section>
+    <section class="hero" id="hero" aria-label="WJ NOIR fragrance film campaign"><div class="hero-video-wrap"><video id="hero-video" class="hero-video" muted loop playsinline preload="none" poster="${ASSET}the-office-poster.jpg"><source src="${ASSET}the-office-hero.mp4" type="video/mp4"/></video></div><div class="hero-shade"></div><div class="hero-noise"></div><div class="hero-top-copy"><p class="hero-intro animate-in">For those who choose their own way.<br/>Your presence. Your signature. Your rules.</p></div><div class="hero-proof animate-in" aria-label="Three signature fragrances"><div class="hero-fragrance-orbit"><img src="${ASSET}wj-noir-the-office.jpg" alt="" decoding="async" fetchpriority="low"/><img src="${ASSET}wj-noir-ice-desire.jpg" alt="" decoding="async" fetchpriority="low"/><img src="${ASSET}wj-noir-levoria.jpg" alt="" decoding="async" fetchpriority="low"/></div><p>THREE SIGNATURES.<br/>ONE UNMISTAKABLE PRESENCE.</p></div><div class="hero-content"><p class="eyebrow hero-kicker animate-in"><span class="line-accent"></span>THE WORLD OF WJ NOIR <span class="kicker-index">— 001</span></p><h1 class="animate-in hero-heading">WEAR YOUR<br/><em>PRESENCE.</em></h1><p class="hero-description animate-in">An entrance you feel.<br/>An impression that stays.</p></div><div class="hero-actions animate-in">${buttonLink('/about','DISCOVER THE HOUSE','outline')}${buttonLink('/shop','SHOP THE COLLECTION')}</div><div class="hero-bottom"><span class="hero-scroll">SCROLL TO DISCOVER <span class="scroll-line"></span></span><span>01 / 03 — THE SIGNATURE COLLECTION</span><span class="hero-video-mark">FILM 001&nbsp; ↗</span></div></section>
+    <section class="about-intro section-pad" id="story"><span class="eyebrow ink-muted">THE HOUSE OF WJ NOIR</span><p>We create fragrances for those who choose their own way. Each scent is thoughtfully composed to express individuality, leave a lasting impression, and feel unmistakably yours.</p><a class="about-intro-link" href="/about">OUR STORY <span>↗</span></a></section>
+    <section class="products-section most-wanted-section" id="collection"><div class="section-heading-row reveal"><div><span class="eyebrow ink-muted">THE WJ NOIR COLLECTION</span><h2>MOST WANTED</h2></div><a class="most-wanted-explore" href="/shop">EXPLORE ALL <span>↗</span></a></div><div class="products-grid">${fragrances.map(p=>card(p,'most-wanted-card')).join('')}</div><div class="under-products reveal"><span>THREE DISTINCT WORLDS. ONE UNMISTAKABLE PRESENCE.</span><span>50 ML / EAU DE PARFUM</span></div></section>
+    <section class="collection-banner" id="after-hours"><div class="collection-bg"><img loading="lazy" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR three perfumes on dark wet volcanic rocks and water"/></div><div class="collection-gradient"></div><div class="collection-copy reveal"><div class="eyebrow light-muted"><span class="line-accent"></span>THE COLLECTION / NO. 01</div><h2>AFTER<br/><em>HOURS.</em></h2><p>Dark. Distinct. Uncompromising.<br/>A signature that refuses to go unnoticed.</p>${buttonLink('/shop','EXPLORE COLLECTION')}</div><div class="banner-footnote">THE NOIR EDIT&nbsp; / &nbsp;WJ FRAGRANCE HOUSE</div></section>
+    <section class="editorial-section" id="universes"><div class="editorial-heading section-pad reveal"><span class="eyebrow ink-muted">BEYOND THE ORDINARY / 002</span><h2>Three scents.<br/><em>Infinite expression.</em></h2><p>Every signature has its own world. Find the one that feels like yours.</p></div><div class="editorial-grid"><a href="/fragrance/ice-desire" class="editorial-card cold reveal"><div class="editorial-photo"><img loading="lazy" decoding="async" src="${ASSET}wj-noir-ice-desire-water.jpg" alt="Ice Desire perfume among snow, mountains and icy reflective water"/></div><div class="editorial-copy"><span>01 / FRESH. REFINED. UNTOUCHED.</span><div><h3>ICE <em>DESIRE.</em></h3><span class="editorial-arrow">↗</span></div></div></a><a href="/fragrance/levoria" class="editorial-card warm reveal"><div class="editorial-photo"><img loading="lazy" decoding="async" src="${ASSET}wj-noir-levoria.jpg" alt="Lévoria deep burgundy perfume with vanilla blossoms and warm sunlight"/></div><div class="editorial-copy"><span>02 / SOFT. GOLDEN. UNFORGETTABLE.</span><div><h3><em>LÉVORIA.</em></h3><span class="editorial-arrow">↗</span></div></div></a></div></section>
     <section class="quote-section"><div class="quote-outline">WJ NOIR</div><div class="quote-center reveal"><div class="eyebrow gold-muted">THE HOUSE PHILOSOPHY</div><div class="quote-mark">“</div><blockquote>Wear your presence.<br/><em>Leave your story.</em></blockquote><div class="quote-symbol">✦</div></div></section>
-    <section class="closing-visual"><img loading="lazy" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR collection displayed beside a reflective alpine lake"/><div class="closing-overlay"></div><div class="closing-content reveal"><span class="eyebrow">WJ NOIR / THE COLLECTION</span><h2>YOUR NEXT<br/><em>SIGNATURE.</em></h2>${buttonLink('#/shop','DISCOVER ALL FRAGRANCES')}</div></section>
+    <section class="closing-visual"><img loading="lazy" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR collection displayed beside a reflective alpine lake"/><div class="closing-overlay"></div><div class="closing-content reveal"><span class="eyebrow">WJ NOIR / THE COLLECTION</span><h2>YOUR NEXT<br/><em>SIGNATURE.</em></h2>${buttonLink('/shop','DISCOVER ALL FRAGRANCES')}</div></section>
   </main>`; }
 function shop() { return `<main class="interior-page"><section class="page-intro shop-intro"><span class="eyebrow ink-muted">WJ NOIR / THE COLLECTION</span><h1>Find your <em>signature.</em></h1><p>Three distinct expressions of the unforgettable. Discover your world.</p></section><div class="shop-filter-row"><span>THE COMPLETE COLLECTION / 03</span><span>EAU DE PARFUM · 50 ML</span></div><section class="shop-products section-pad"><div class="products-grid">${fragrances.map(p=>card(p)).join('')}</div></section><section class="shop-visual"><img src="${ASSET}dark-collection-alt.webp" alt="WJ NOIR fragrance collection on glossy black rocks" loading="lazy"/><div class="shop-visual-copy"><span class="eyebrow">A WORLD OF DISTINCTION</span><h2>THE NOIR <em>EDIT.</em></h2></div></section></main>`; }
-function about() { return `<main class="interior-page"><section class="about-hero"><img src="${ASSET}dark-collection-alt.webp" alt="Dramatic WJ NOIR perfume campaign on black rocks in an alpine landscape"/><div class="about-hero-shade"></div><div class="about-hero-content reveal"><span class="eyebrow">THE STORY / WJ NOIR</span><h1>NOT MADE<br/>TO <em>BLEND IN.</em></h1><p>A fragrance house inspired by presence, character and the beautiful art of being remembered.</p></div></section><section class="about-copy section-pad"><div class="eyebrow ink-muted">OUR PHILOSOPHY / 001</div><h2>A scent can say<br/>what words <em>cannot.</em></h2><div class="about-copy-bottom"><p>We believe a fragrance is a deeply personal signature. It can be bold or quiet, warm or refreshing, but it should always feel unmistakably yours.</p><p>From the focused confidence of The Office to the icy allure of Ice Desire and the intimate warmth of Lévoria, our collection celebrates three very different ways to leave an impression.</p></div></section><section class="about-strip"><img loading="lazy" src="${ASSET}dark-collection-alt.webp" alt="Three WJ NOIR perfumes arranged in the mountains"/></section><section class="about-cta section-pad"><span class="eyebrow ink-muted">THE INVITATION</span><h2>DISCOVER YOUR<br/><em>OWN SIGNATURE.</em></h2><a class="button dark-btn" href="#/shop">EXPLORE THE COLLECTION <span>↗</span></a></section></main>`; }
+function about() { return `<main class="interior-page"><section class="about-hero"><img src="${ASSET}dark-collection-alt.webp" alt="Dramatic WJ NOIR perfume campaign on black rocks in an alpine landscape"/><div class="about-hero-shade"></div><div class="about-hero-content reveal"><span class="eyebrow">THE STORY / WJ NOIR</span><h1>NOT MADE<br/>TO <em>BLEND IN.</em></h1><p>A fragrance house inspired by presence, character and the beautiful art of being remembered.</p></div></section><section class="about-copy section-pad"><div class="eyebrow ink-muted">OUR PHILOSOPHY / 001</div><h2>A scent can say<br/>what words <em>cannot.</em></h2><div class="about-copy-bottom"><p>We believe a fragrance is a deeply personal signature. It can be bold or quiet, warm or refreshing, but it should always feel unmistakably yours.</p><p>From the focused confidence of The Office to the icy allure of Ice Desire and the intimate warmth of Lévoria, our collection celebrates three very different ways to leave an impression.</p></div></section><section class="about-strip"><img loading="lazy" src="${ASSET}dark-collection-alt.webp" alt="Three WJ NOIR perfumes arranged in the mountains"/></section><section class="about-cta section-pad"><span class="eyebrow ink-muted">THE INVITATION</span><h2>DISCOVER YOUR<br/><em>OWN SIGNATURE.</em></h2><a class="button dark-btn" href="/shop">EXPLORE THE COLLECTION <span>↗</span></a></section></main>`; }
 function product(p) {
   const related = fragrances.filter(other=>other.id!==p.id);
   const gallery = p.gallery || [p.image,p.altImage,p.image,p.altImage];
@@ -97,9 +97,9 @@ function product(p) {
         <span class="product-sticky-price">PKR ${p.price.toLocaleString('en-PK')}</span>
         <button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}" tabindex="-1">BUY NOW <span>↗</span></button>
       </div>`;
-  return `<main class="interior-page product-page product-page--premium"><section class="product-detail-layout">${galleryMarkup}${infoMarkup}</section>${stickyPurchase}<section class="product-film" aria-label="${escapeHtml(p.title)} fragrance film"><video class="product-film-video" muted loop playsinline preload="none" poster="${ASSET+filmPoster}" aria-label="Cinematic WJ NOIR ${escapeHtml(p.title)} perfume film"><source src="${ASSET+film}" type="video/mp4"/></video></section><section class="related-products section-pad"><div class="section-heading-row"><div><span class="eyebrow ink-muted">CONTINUE EXPLORING</span><h2>YOU MAY ALSO <em>LOVE.</em></h2></div><a class="text-link" href="#/shop">VIEW ALL <span>↗</span></a></div><div class="products-grid related-grid">${related.map(other=>card(other)).join('')}</div></section></main>`;
+  return `<main class="interior-page product-page product-page--premium"><section class="product-detail-layout">${galleryMarkup}${infoMarkup}</section>${stickyPurchase}<section class="product-film" aria-label="${escapeHtml(p.title)} fragrance film"><video class="product-film-video" muted loop playsinline preload="none" poster="${ASSET+filmPoster}" aria-label="Cinematic WJ NOIR ${escapeHtml(p.title)} perfume film"><source src="${ASSET+film}" type="video/mp4"/></video></section><section class="related-products section-pad"><div class="section-heading-row"><div><span class="eyebrow ink-muted">CONTINUE EXPLORING</span><h2>YOU MAY ALSO <em>LOVE.</em></h2></div><a class="text-link" href="/shop">VIEW ALL <span>↗</span></a></div><div class="products-grid related-grid">${related.map(other=>card(other)).join('')}</div></section></main>`;
 }
-function notFound(){return `<main class="not-found"><span class="eyebrow">PAGE NOT FOUND</span><h1>Lost your <em>scent?</em></h1><a class="button dark-btn" href="#/">RETURN HOME <span>↗</span></a></main>`;}
+function notFound(){return `<main class="not-found"><span class="eyebrow">PAGE NOT FOUND</span><h1>Lost your <em>scent?</em></h1><a class="button dark-btn" href="/">RETURN HOME <span>↗</span></a></main>`;}
 function setupReveals(){const els=document.querySelectorAll('.reveal'); if(reducedMotion || !('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('is-visible'));return;} const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}})},{threshold:.08,rootMargin:'0px 0px -35px 0px'});els.forEach(e=>io.observe(e));}
 function setupVideo(){
   const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
@@ -224,10 +224,125 @@ function setupPurchaseControls(){
   }));
   setupStickyPurchase();
 }
+const SITE_ORIGIN='https://www.wjnoir.store';
+const SEO_ROUTES={
+  '/':{
+    title:'WJ NOIR | Premium Perfumes in Pakistan',
+    description:'Discover WJ NOIR fragrances in Pakistan: The Office, Ice Desire and Lévoria. Three distinct signatures crafted for presence, confidence and individuality.',
+    image:'/assets/dark-collection.webp',
+    index:true
+  },
+  '/shop':{
+    title:'Shop WJ NOIR Perfumes in Pakistan | The Collection',
+    description:'Shop the WJ NOIR fragrance collection in Pakistan. Explore The Office, Ice Desire and Lévoria Eau de Parfum in 50 ml.',
+    image:'/assets/dark-collection.webp',
+    index:true
+  },
+  '/about':{
+    title:'Our Story | WJ NOIR Fragrance House',
+    description:'Discover the story and philosophy behind WJ NOIR, a fragrance house built around individuality, presence and signature scent.',
+    image:'/assets/dark-collection.webp',
+    index:true
+  }
+};
 function routePath(){
-  if(window.location.hash.startsWith('#/'))return window.location.hash.slice(1).split('?')[0];
-  if(['/checkout','/order-confirmed','/admin'].includes(window.location.pathname))return window.location.pathname;
-  return '/';
+  if(window.location.hash.startsWith('#/')){
+    const legacy=window.location.hash.slice(1).split('?')[0]||'/';
+    history.replaceState({},'',legacy);
+    return legacy;
+  }
+  return window.location.pathname.replace(/\/+$/,'')||'/';
+}
+function ensureMeta(selector,create){
+  let el=document.head.querySelector(selector);
+  if(!el){el=create();document.head.appendChild(el);}
+  return el;
+}
+function setMeta(selector,content,create){
+  const el=ensureMeta(selector,create);
+  el.setAttribute('content',content);
+}
+function updateSeo(path,p){
+  const privateRoute=['/checkout','/order-confirmed','/admin'].includes(path);
+  const seo=p?{
+    title:`${p.title} Perfume | WJ NOIR Pakistan`,
+    description:`${p.title} by WJ NOIR — ${p.description} Explore the 50 ml Eau de Parfum and order in Pakistan.`,
+    image:`${ASSET}${p.image}`,
+    index:true
+  }:(SEO_ROUTES[path]||{
+    title:'Page Not Found | WJ NOIR',
+    description:'The requested WJ NOIR page could not be found.',
+    image:'/assets/dark-collection.webp',
+    index:false
+  });
+
+  document.title=privateRoute
+    ? (path==='/checkout'?'Checkout | WJ NOIR':path==='/admin'?'Orders | WJ NOIR':'Order Received | WJ NOIR')
+    : seo.title;
+
+  const canonicalUrl=`${SITE_ORIGIN}${path==='/'?'':path}`;
+  const absoluteImage=new URL(seo.image,SITE_ORIGIN).href;
+  const robotsValue=(privateRoute||!seo.index)
+    ? 'noindex,nofollow'
+    : 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
+
+  setMeta('meta[name="description"]',seo.description,()=>{const e=document.createElement('meta');e.name='description';return e;});
+  setMeta('meta[name="robots"]',robotsValue,()=>{const e=document.createElement('meta');e.name='robots';return e;});
+  setMeta('meta[property="og:title"]',document.title,()=>{const e=document.createElement('meta');e.setAttribute('property','og:title');return e;});
+  setMeta('meta[property="og:description"]',seo.description,()=>{const e=document.createElement('meta');e.setAttribute('property','og:description');return e;});
+  setMeta('meta[property="og:image"]',absoluteImage,()=>{const e=document.createElement('meta');e.setAttribute('property','og:image');return e;});
+  setMeta('meta[property="og:url"]',canonicalUrl,()=>{const e=document.createElement('meta');e.setAttribute('property','og:url');return e;});
+  setMeta('meta[property="og:type"]',p?'product':'website',()=>{const e=document.createElement('meta');e.setAttribute('property','og:type');return e;});
+  setMeta('meta[name="twitter:card"]','summary_large_image',()=>{const e=document.createElement('meta');e.name='twitter:card';return e;});
+  setMeta('meta[name="twitter:title"]',document.title,()=>{const e=document.createElement('meta');e.name='twitter:title';return e;});
+  setMeta('meta[name="twitter:description"]',seo.description,()=>{const e=document.createElement('meta');e.name='twitter:description';return e;});
+  setMeta('meta[name="twitter:image"]',absoluteImage,()=>{const e=document.createElement('meta');e.name='twitter:image';return e;});
+
+  const canonical=ensureMeta('link[rel="canonical"]',()=>{const e=document.createElement('link');e.rel='canonical';return e;});
+  canonical.href=canonicalUrl;
+
+  let schema=document.getElementById('seo-jsonld');
+  if(!schema){
+    schema=document.createElement('script');
+    schema.type='application/ld+json';
+    schema.id='seo-jsonld';
+    document.head.appendChild(schema);
+  }
+
+  const graph=[{
+    '@type':'OnlineStore',
+    '@id':`${SITE_ORIGIN}/#store`,
+    name:'WJ NOIR',
+    url:`${SITE_ORIGIN}/`,
+    logo:`${SITE_ORIGIN}/assets/wj-noir-logo.png`,
+    email:'wjnoir@gmail.com',
+    sameAs:[
+      'https://www.instagram.com/wjnoir',
+      'https://www.tiktok.com/@wj.noir'
+    ]
+  }];
+
+  if(p){
+    graph.push({
+      '@type':'Product',
+      '@id':`${canonicalUrl}#product`,
+      name:`WJ NOIR ${p.title}`,
+      brand:{'@type':'Brand',name:'WJ NOIR'},
+      description:p.description,
+      image:(p.gallery||[p.image]).map(file=>new URL(ASSET+file,SITE_ORIGIN).href),
+      category:'Eau de Parfum',
+      size:'50 ml',
+      url:canonicalUrl,
+      offers:{
+        '@type':'Offer',
+        url:canonicalUrl,
+        priceCurrency:'PKR',
+        price:String(p.price),
+        itemCondition:'https://schema.org/NewCondition'
+      }
+    });
+  }
+  schema.textContent=JSON.stringify({'@context':'https://schema.org','@graph':graph});
 }
 function navigateTo(path){history.pushState({},'',path);route();}
 function route(){
@@ -239,7 +354,7 @@ function route(){
   else if(path==='/order-confirmed')app.innerHTML=confirmationPage();
   else if(path==='/admin')app.innerHTML=adminPage();
   else app.innerHTML=path==='/'?home():path==='/shop'?shop():path==='/about'?about():p?product(p):notFound();
-  document.title=(p?p.title+' — ':path==='/shop'?'The Collection — ':path==='/about'?'Our Story — ':path==='/checkout'?'Checkout — ':path==='/admin'?'Orders — ':'')+'WJ NOIR';
+  updateSeo(path,p);
   window.scrollTo({top:0,behavior:'instant'});
   setupReveals();setupVideo();setupGallery();setupPurchaseControls();
   document.querySelectorAll('[data-add]').forEach(btn=>btn.addEventListener('click',()=>addToCart(btn.dataset.add,1)));
@@ -316,7 +431,7 @@ function renderBag(){
   document.getElementById('bag-count').hidden=count===0;
   document.getElementById('bag-heading-count').textContent=`(${count})`;
   const bagList=document.getElementById('bag-list');
-  bagList.innerHTML=cart.length?cart.map(cartItemMarkup).join(''):`<div class="empty-bag"><span class="empty-icon">✧</span><h3>Your next signature awaits.</h3><p>Explore the collection and find a fragrance that speaks to you.</p><a href="#/shop" class="button dark-btn" data-close="bag">DISCOVER COLLECTION <span>↗</span></a></div>`;
+  bagList.innerHTML=cart.length?cart.map(cartItemMarkup).join(''):`<div class="empty-bag"><span class="empty-icon">✧</span><h3>Your next signature awaits.</h3><p>Explore the collection and find a fragrance that speaks to you.</p><a href="/shop" class="button dark-btn" data-close="bag">DISCOVER COLLECTION <span>↗</span></a></div>`;
   const footer=document.getElementById('bag-bottom');
   footer.hidden=cart.length===0;
   document.getElementById('bag-subtotal').textContent=`PKR ${cartSubtotal(cart).toLocaleString('en-PK')}`;
@@ -324,19 +439,19 @@ function renderBag(){
 function currentCheckoutItems(){return checkoutDraft?.length?checkoutDraft:cart;}
 function checkoutPage(){
   const items=currentCheckoutItems();
-  if(!items.length)return `<main class="commerce-page checkout-page"><span class="eyebrow ink-muted">YOUR ORDER</span><h1>Your cart is empty.</h1><p>Discover the WJ NOIR collection and choose a signature.</p><a class="button dark-btn" href="#/shop">DISCOVER THE COLLECTION <span>↗</span></a></main>`;
+  if(!items.length)return `<main class="commerce-page checkout-page"><span class="eyebrow ink-muted">YOUR ORDER</span><h1>Your cart is empty.</h1><p>Discover the WJ NOIR collection and choose a signature.</p><a class="button dark-btn" href="/shop">DISCOVER THE COLLECTION <span>↗</span></a></main>`;
   const rows=items.map(item=>{
     const p=fragrances.find(product=>product.id===item.id);
     return p?`<div class="checkout-item"><img src="${ASSET+p.image}" alt=""/><div><strong>${escapeHtml(p.title)}</strong><span>50 ml · Eau de Parfum · Qty ${item.quantity}</span></div><b>PKR ${(p.price*item.quantity).toLocaleString('en-PK')}</b></div>`:'';
   }).join('');
-  return `<main class="commerce-page checkout-page"><a class="commerce-back-link" href="#/shop">← CONTINUE EXPLORING</a><div class="commerce-heading"><span class="eyebrow ink-muted">WJ NOIR / CHECKOUT</span><h1>Complete your <em>order.</em></h1><p>We will contact you to confirm delivery details.</p></div><div class="checkout-layout"><form id="checkout-form" class="checkout-form" novalidate><h2>Delivery details</h2><div class="checkout-field"><label for="customer-name">Full name</label><input id="customer-name" name="customer_name" autocomplete="name" maxlength="120" required/></div><div class="checkout-field"><label for="customer-email">Email</label><input id="customer-email" name="email" type="email" autocomplete="email" maxlength="254" required/></div><div class="checkout-field"><label for="customer-phone">Phone number</label><input id="customer-phone" name="phone" type="tel" autocomplete="tel" maxlength="30" required/><small>Include at least 10 digits.</small></div><div class="checkout-field"><label for="customer-address">Street address</label><input id="customer-address" name="address" autocomplete="street-address" maxlength="300" required/></div><div class="checkout-field-grid"><div class="checkout-field"><label for="customer-city">City</label><input id="customer-city" name="city" autocomplete="address-level2" maxlength="100" required/></div><div class="checkout-field"><label for="customer-state">State / province</label><input id="customer-state" name="state" autocomplete="address-level1" maxlength="100" required/></div><div class="checkout-field"><label for="customer-postal-code">Postal code</label><input id="customer-postal-code" name="postal_code" autocomplete="postal-code" maxlength="20" required/></div><div class="checkout-field"><label for="customer-country">Country</label><input id="customer-country" name="country" autocomplete="country-name" maxlength="100" required/></div></div><div class="checkout-field"><label for="order-notes">Order notes <span>(optional)</span></label><textarea id="order-notes" name="notes" rows="3" maxlength="1000"></textarea></div><fieldset class="payment-choice"><legend>Payment method</legend><label><input type="radio" name="payment_method" value="Cash on Delivery" checked/><span><strong>Cash on Delivery</strong><small>Pay when your order arrives.</small></span></label></fieldset><p id="checkout-error" class="form-message" role="alert" hidden></p><button id="place-order" type="submit" class="button dark-btn checkout-submit">PLACE ORDER · PKR ${cartSubtotal(items).toLocaleString('en-PK')}</button></form><aside class="checkout-summary"><h2>Order summary</h2>${rows}<div class="checkout-total"><span>Total</span><strong>PKR ${cartSubtotal(items).toLocaleString('en-PK')}</strong></div><p>50 ml · Eau de Parfum</p></aside></div></main>`;
+  return `<main class="commerce-page checkout-page"><a class="commerce-back-link" href="/shop">← CONTINUE EXPLORING</a><div class="commerce-heading"><span class="eyebrow ink-muted">WJ NOIR / CHECKOUT</span><h1>Complete your <em>order.</em></h1><p>We will contact you to confirm delivery details.</p></div><div class="checkout-layout"><form id="checkout-form" class="checkout-form" novalidate><h2>Delivery details</h2><div class="checkout-field"><label for="customer-name">Full name</label><input id="customer-name" name="customer_name" autocomplete="name" maxlength="120" required/></div><div class="checkout-field"><label for="customer-email">Email</label><input id="customer-email" name="email" type="email" autocomplete="email" maxlength="254" required/></div><div class="checkout-field"><label for="customer-phone">Phone number</label><input id="customer-phone" name="phone" type="tel" autocomplete="tel" maxlength="30" required/><small>Include at least 10 digits.</small></div><div class="checkout-field"><label for="customer-address">Street address</label><input id="customer-address" name="address" autocomplete="street-address" maxlength="300" required/></div><div class="checkout-field-grid"><div class="checkout-field"><label for="customer-city">City</label><input id="customer-city" name="city" autocomplete="address-level2" maxlength="100" required/></div><div class="checkout-field"><label for="customer-state">State / province</label><input id="customer-state" name="state" autocomplete="address-level1" maxlength="100" required/></div><div class="checkout-field"><label for="customer-postal-code">Postal code</label><input id="customer-postal-code" name="postal_code" autocomplete="postal-code" maxlength="20" required/></div><div class="checkout-field"><label for="customer-country">Country</label><input id="customer-country" name="country" autocomplete="country-name" maxlength="100" required/></div></div><div class="checkout-field"><label for="order-notes">Order notes <span>(optional)</span></label><textarea id="order-notes" name="notes" rows="3" maxlength="1000"></textarea></div><fieldset class="payment-choice"><legend>Payment method</legend><label><input type="radio" name="payment_method" value="Cash on Delivery" checked/><span><strong>Cash on Delivery</strong><small>Pay when your order arrives.</small></span></label></fieldset><p id="checkout-error" class="form-message" role="alert" hidden></p><button id="place-order" type="submit" class="button dark-btn checkout-submit">PLACE ORDER · PKR ${cartSubtotal(items).toLocaleString('en-PK')}</button></form><aside class="checkout-summary"><h2>Order summary</h2>${rows}<div class="checkout-total"><span>Total</span><strong>PKR ${cartSubtotal(items).toLocaleString('en-PK')}</strong></div><p>50 ml · Eau de Parfum</p></aside></div></main>`;
 }
 function confirmationPage(){
   let confirmation=null;
   try{confirmation=JSON.parse(sessionStorage.getItem('wj-noir-confirmation')||'null');}
   catch(error){console.error('Unable to read the order confirmation.',error);}
-  if(!confirmation?.orderNumber)return `<main class="commerce-page confirmation-page"><span class="eyebrow ink-muted">WJ NOIR</span><h1>Your order details are unavailable.</h1><a class="button dark-btn" href="#/">RETURN HOME <span>↗</span></a></main>`;
-  return `<main class="commerce-page confirmation-page"><span class="confirmation-mark" aria-hidden="true">✓</span><span class="eyebrow ink-muted">WJ NOIR / ORDER RECEIVED</span><h1>Thank you for your <em>order.</em></h1><p class="confirmation-order-number">ORDER ${escapeHtml(confirmation.orderNumber)}</p><p>We have received your order and will contact you soon. A confirmation email will be sent to <strong>${escapeHtml(confirmation.email)}</strong>.</p><div class="confirmation-total"><span>Order total · Cash on Delivery</span><strong>PKR ${Number(confirmation.total).toLocaleString('en-PK')}</strong></div><a class="button dark-btn" href="#/">RETURN TO WJ NOIR <span>↗</span></a></main>`;
+  if(!confirmation?.orderNumber)return `<main class="commerce-page confirmation-page"><span class="eyebrow ink-muted">WJ NOIR</span><h1>Your order details are unavailable.</h1><a class="button dark-btn" href="/">RETURN HOME <span>↗</span></a></main>`;
+  return `<main class="commerce-page confirmation-page"><span class="confirmation-mark" aria-hidden="true">✓</span><span class="eyebrow ink-muted">WJ NOIR / ORDER RECEIVED</span><h1>Thank you for your <em>order.</em></h1><p class="confirmation-order-number">ORDER ${escapeHtml(confirmation.orderNumber)}</p><p>We have received your order and will contact you soon. A confirmation email will be sent to <strong>${escapeHtml(confirmation.email)}</strong>.</p><div class="confirmation-total"><span>Order total · Cash on Delivery</span><strong>PKR ${Number(confirmation.total).toLocaleString('en-PK')}</strong></div><a class="button dark-btn" href="/">RETURN TO WJ NOIR <span>↗</span></a></main>`;
 }
 async function getSupabase(){
   if(!supabaseClientPromise){
@@ -609,6 +724,16 @@ function renderAdminOrders(){
 }
 function setupGlobalCommerceActions(){
   document.addEventListener('click',event=>{
+    const internalLink=event.target.closest('a[href^="/"]');
+    if(internalLink&&!event.defaultPrevented&&event.button===0&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&internalLink.target!=='_blank'){
+      const url=new URL(internalLink.href,window.location.origin);
+      if(url.origin===window.location.origin){
+        event.preventDefault();
+        closeAll();
+        navigateTo(url.pathname+url.search);
+        return;
+      }
+    }
     const adminTrigger=event.target.closest('[data-admin-trigger]');
     if(adminTrigger){
       adminTriggerClicks+=1;
@@ -634,7 +759,7 @@ function setupGlobalCommerceActions(){
     }
   });
 }
-function renderSearch(){const q=document.getElementById('search-input').value.trim().toLowerCase();const results=fragrances.filter(p=>!q||[p.title,p.category,p.tagline,...p.tones,...p.notes.map(n=>n.note)].join(' ').toLowerCase().includes(q));document.getElementById('search-results').innerHTML=results.length?results.map(p=>`<a class="search-result" href="#/fragrance/${p.id}" data-close="search"><img src="${ASSET+p.image}" alt=""/><span><small>${p.category} · EAU DE PARFUM</small><strong>${p.title}</strong><small>${p.tones.join(' / ')}</small></span><i>↗</i></a>`).join(''):`<div class="search-empty">No fragrance matched your search. Try “woody”, “ice” or “vanilla”.</div>`;}
+function renderSearch(){const q=document.getElementById('search-input').value.trim().toLowerCase();const results=fragrances.filter(p=>!q||[p.title,p.category,p.tagline,...p.tones,...p.notes.map(n=>n.note)].join(' ').toLowerCase().includes(q));document.getElementById('search-results').innerHTML=results.length?results.map(p=>`<a class="search-result" href="/fragrance/${p.id}" data-close="search"><img src="${ASSET+p.image}" alt=""/><span><small>${p.category} · EAU DE PARFUM</small><strong>${p.title}</strong><small>${p.tones.join(' / ')}</small></span><i>↗</i></a>`).join(''):`<div class="search-empty">No fragrance matched your search. Try “woody”, “ice” or “vanilla”.</div>`;}
 document.getElementById('menu-toggle').addEventListener('click',()=>toggleOverlay('menu'));
 document.getElementById('search-toggle').addEventListener('click',()=>toggleOverlay('search'));
 document.getElementById('bag-toggle').addEventListener('click',()=>toggleOverlay('bag'));
