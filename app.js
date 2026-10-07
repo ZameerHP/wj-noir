@@ -462,11 +462,48 @@ function renderAdminDashboard(client){
   const root=document.getElementById('admin-content');
   if(!root)return;
   const totalRevenue=adminOrders.filter(order=>order.status!=='cancelled').reduce((sum,order)=>sum+Number(order.total_amount),0);
-  root.innerHTML=`<div class="admin-heading"><div><span class="eyebrow ink-muted">WJ NOIR / PRIVATE</span><h1>Orders.</h1></div><button type="button" id="admin-logout" class="admin-logout">SIGN OUT</button></div><div class="admin-stats"><article><span>TOTAL ORDERS</span><strong>${adminOrders.length}</strong></article><article><span>REVENUE · EXCLUDING CANCELLED</span><strong>PKR ${totalRevenue.toLocaleString('en-PK')}</strong></article></div><div class="admin-tools"><label class="sr-only" for="admin-search">Search orders</label><input id="admin-search" placeholder="Search name, email, phone or order number"/><label class="sr-only" for="admin-status-filter">Filter by status</label><select id="admin-status-filter"><option value="">All statuses</option>${['pending','confirmed','shipped','delivered','cancelled'].map(status=>`<option value="${status}">${status}</option>`).join('')}</select></div><div id="admin-order-list" class="admin-order-list"></div>`;
+  root.innerHTML=`<div class="admin-heading"><div><span class="eyebrow ink-muted">WJ NOIR / PRIVATE</span><h1>Orders.</h1></div><div class="admin-heading-actions"><button type="button" id="admin-delete-all" class="admin-danger" ${adminOrders.length?'':'disabled'}>DELETE ALL ORDERS</button><button type="button" id="admin-logout" class="admin-logout">SIGN OUT</button></div></div><div class="admin-stats"><article><span>TOTAL ORDERS</span><strong>${adminOrders.length}</strong></article><article><span>REVENUE · EXCLUDING CANCELLED</span><strong>PKR ${totalRevenue.toLocaleString('en-PK')}</strong></article></div><div class="admin-tools"><label class="sr-only" for="admin-search">Search orders</label><input id="admin-search" placeholder="Search name, email, phone or order number"/><label class="sr-only" for="admin-status-filter">Filter by status</label><select id="admin-status-filter"><option value="">All statuses</option>${['pending','confirmed','shipped','delivered','cancelled'].map(status=>`<option value="${status}">${status}</option>`).join('')}</select></div><div id="admin-order-list" class="admin-order-list"></div>`;
   document.getElementById('admin-logout').addEventListener('click',async()=>{
     const {error}=await client.auth.signOut();
     if(error){console.error('Admin sign-out failed.',error);showToast('Unable to sign out. Please try again.');return;}
     adminOrders=[];route();
+  });
+  document.getElementById('admin-delete-all')?.addEventListener('click',async()=>{
+    if(!adminOrders.length){showToast('There are no orders to delete.');return;}
+    const typed=window.prompt('This permanently deletes every order and its line items. Type DELETE ALL to continue.');
+    if(typed!=='DELETE ALL'){showToast('Delete all cancelled.');return;}
+    if(!window.confirm(`Permanently delete all ${adminOrders.length} orders? This cannot be undone.`))return;
+
+    const button=document.getElementById('admin-delete-all');
+    button.disabled=true;
+    const originalText=button.textContent;
+    button.textContent='DELETING...';
+    try{
+      const {data:sessionData,error:sessionError}=await client.auth.getSession();
+      if(sessionError)throw new Error(sessionError.message);
+      const accessToken=sessionData?.session?.access_token;
+      if(!accessToken)throw new Error('Your admin session expired. Please sign in again.');
+
+      const response=await fetch('/api/delete-orders',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':`Bearer ${accessToken}`
+        },
+        body:JSON.stringify({confirmation:'DELETE ALL'})
+      });
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||'Orders could not be deleted.');
+
+      selectedAdminOrderId=null;
+      await refreshAdminOrders(client);
+      showToast(`${Number(result.deleted||0).toLocaleString()} orders permanently deleted.`);
+    }catch(error){
+      console.error('Unable to delete all orders.',error);
+      showToast(error.message||'Orders could not be deleted.');
+      button.disabled=false;
+      button.textContent=originalText;
+    }
   });
   document.getElementById('admin-search').addEventListener('input',renderAdminOrders);
   document.getElementById('admin-status-filter').addEventListener('change',renderAdminOrders);
