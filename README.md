@@ -92,7 +92,7 @@ Deploy the project to Vercel with **Framework Preset: Other**, no build command,
 
 Test a product page → Add to Cart → cart quantity/remove controls → Checkout → order confirmation. Also test Buy Now to confirm only the selected product is checked out. Confirm the order appears in `/admin`, test search/status updates with the allowlisted user, and verify both Resend messages. A real end-to-end test requires your Supabase project, deployed function, Resend key, and verified sending domain.
 
-Update text, product photos and pricing when you have new official product assets. The Office displays PKR 3,000; Ice Desire and Lévoria display PKR 2,500 each. Inventory and online card payments are not configured. Newsletter subscription remains preview-only.
+Update text, product photos and pricing when you have new official product assets. The Office displays PKR 2,999; Ice Desire and Lévoria display PKR 2,499 each. Inventory and online card payments are not configured. Newsletter subscription remains preview-only.
 
 Your supplied original photographs showed The Office with bergamot / lavender / woody, and Lévoria with vanilla / fruity / woody notes. Ice Desire's specific notes were not supplied, so its page uses sensory descriptions instead of fabricated ingredients.
 
