@@ -1,0 +1,14 @@
+{
+  "name": "WJ NOIR",
+  "short_name": "WJ NOIR",
+  "icons": [
+    {
+      "src": "/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#11110f",
+  "background_color": "#11110f",
+  "display": "standalone"
+}
