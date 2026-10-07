@@ -491,13 +491,45 @@ function renderAdminOrders(){
   }).join('');
   container.querySelectorAll('[data-order-detail]').forEach(button=>button.addEventListener('click',()=>{selectedAdminOrderId=selectedAdminOrderId===button.dataset.orderDetail?null:button.dataset.orderDetail;renderAdminOrders();}));
   container.querySelectorAll('[data-order-status]').forEach(select=>select.addEventListener('change',async()=>{
+    const orderId=select.dataset.orderStatus;
+    const nextStatus=select.value;
     select.disabled=true;
     try{
       const client=await getSupabase();
-      const {error}=await client.from('orders').update({status:select.value}).eq('id',select.dataset.orderStatus);
+      const {data:sessionData,error:sessionError}=await client.auth.getSession();
+      if(sessionError)throw new Error(sessionError.message);
+      const accessToken=sessionData?.session?.access_token;
+      if(!accessToken)throw new Error('Your admin session expired. Please sign in again.');
+
+      const {error}=await client.from('orders').update({status:nextStatus}).eq('id',orderId);
       if(error)throw new Error(error.message);
+
+      let emailWarning='';
+      if(['confirmed','shipped','delivered','cancelled'].includes(nextStatus)){
+        try{
+          const response=await fetch('/api/order-status-email',{
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Authorization':`Bearer ${accessToken}`
+            },
+            body:JSON.stringify({orderId,status:nextStatus})
+          });
+          const result=await response.json().catch(()=>({}));
+          if(!response.ok)throw new Error(result.error||'Customer email could not be sent.');
+        }catch(emailError){
+          console.error('Order status updated, but customer email failed.',emailError);
+          emailWarning=' Status updated, but the customer email could not be sent.';
+        }
+      }
+
       await loadAdminDashboard(client);
-    }catch(error){console.error('Unable to update order status.',error);showToast('Order status could not be updated.');select.disabled=false;}
+      showToast(emailWarning||`Order marked ${nextStatus}. Customer email sent.`);
+    }catch(error){
+      console.error('Unable to update order status.',error);
+      showToast(error.message||'Order status could not be updated.');
+      select.disabled=false;
+    }
   }));
 }
 function setupGlobalCommerceActions(){
