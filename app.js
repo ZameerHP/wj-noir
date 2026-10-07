@@ -519,7 +519,8 @@ function renderAdminOrders(){
           if(!response.ok)throw new Error(result.error||'Customer email could not be sent.');
         }catch(emailError){
           console.error('Order status updated, but customer email failed.',emailError);
-          emailWarning=' Status updated, but the customer email could not be sent.';
+          const safeMessage=String(emailError?.message||'Customer email could not be sent.').replace(/\s+/g,' ').trim();
+          emailWarning=` Status updated, but email failed: ${safeMessage}`;
         }
       }
 
