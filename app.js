@@ -524,9 +524,46 @@ function renderAdminOrders(){
     const isOpen=selectedAdminOrderId===order.id;
     const items=(order.order_items||[]).map(item=>`<div class="admin-detail-item"><span>${escapeHtml(item.product_name)} · ${item.size_ml} ml × ${item.quantity}</span><strong>PKR ${(Number(item.unit_price)*item.quantity).toLocaleString('en-PK')}</strong></div>`).join('');
     const address=[order.address,order.city,order.state,order.postal_code,order.country].filter(Boolean).map(escapeHtml).join(', ');
-    return `<article class="admin-order-card"><button class="admin-order-toggle" type="button" data-order-detail="${order.id}" aria-expanded="${isOpen}"><span><strong>${escapeHtml(order.order_number)}</strong><small>${escapeHtml(order.customer_name)} · ${new Date(order.created_at).toLocaleString()}</small></span><span class="admin-order-total">PKR ${Number(order.total_amount).toLocaleString('en-PK')}</span><span class="admin-status admin-status--${escapeHtml(order.status)}">${escapeHtml(order.status)}</span></button>${isOpen?`<div class="admin-order-details"><p><strong>Email</strong> <a href="mailto:${escapeHtml(order.email)}">${escapeHtml(order.email)}</a></p><p><strong>Phone</strong> ${escapeHtml(order.phone)}</p><p><strong>Address</strong> ${address}</p><p><strong>Payment</strong> ${escapeHtml(order.payment_method)}</p>${order.notes?`<p><strong>Notes</strong> ${escapeHtml(order.notes)}</p>`:''}<div class="admin-detail-items">${items}</div><label class="admin-status-control">Update status<select data-order-status="${order.id}">${['pending','confirmed','shipped','delivered','cancelled'].map(value=>`<option value="${value}" ${value===order.status?'selected':''}>${value}</option>`).join('')}</select></label></div>`:''}</article>`;
+    return `<article class="admin-order-card"><button class="admin-order-toggle" type="button" data-order-detail="${order.id}" aria-expanded="${isOpen}"><span><strong>${escapeHtml(order.order_number)}</strong><small>${escapeHtml(order.customer_name)} · ${new Date(order.created_at).toLocaleString()}</small></span><span class="admin-order-total">PKR ${Number(order.total_amount).toLocaleString('en-PK')}</span><span class="admin-status admin-status--${escapeHtml(order.status)}">${escapeHtml(order.status)}</span></button>${isOpen?`<div class="admin-order-details"><p><strong>Email</strong> <a href="mailto:${escapeHtml(order.email)}">${escapeHtml(order.email)}</a></p><p><strong>Phone</strong> ${escapeHtml(order.phone)}</p><p><strong>Address</strong> ${address}</p><p><strong>Payment</strong> ${escapeHtml(order.payment_method)}</p>${order.notes?`<p><strong>Notes</strong> ${escapeHtml(order.notes)}</p>`:''}<div class="admin-detail-items">${items}</div><div class="admin-order-actions"><label class="admin-status-control">Update status<select data-order-status="${order.id}">${['pending','confirmed','shipped','delivered','cancelled'].map(value=>`<option value="${value}" ${value===order.status?'selected':''}>${value}</option>`).join('')}</select></label><button type="button" class="admin-delete-order" data-delete-order="${order.id}" data-delete-order-number="${escapeHtml(order.order_number)}">DELETE ORDER</button></div></div>`:''}</article>`;
   }).join('');
   container.querySelectorAll('[data-order-detail]').forEach(button=>button.addEventListener('click',()=>{selectedAdminOrderId=selectedAdminOrderId===button.dataset.orderDetail?null:button.dataset.orderDetail;renderAdminOrders();}));
+  container.querySelectorAll('[data-delete-order]').forEach(button=>button.addEventListener('click',async()=>{
+    const orderId=button.dataset.deleteOrder;
+    const orderNumber=button.dataset.deleteOrderNumber||'this order';
+    if(!window.confirm(`Permanently delete ${orderNumber}? This cannot be undone.`))return;
+
+    button.disabled=true;
+    const originalText=button.textContent;
+    button.textContent='DELETING...';
+
+    try{
+      const client=await getSupabase();
+      const {data:sessionData,error:sessionError}=await client.auth.getSession();
+      if(sessionError)throw new Error(sessionError.message);
+      const accessToken=sessionData?.session?.access_token;
+      if(!accessToken)throw new Error('Your admin session expired. Please sign in again.');
+
+      const response=await fetch('/api/delete-orders',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':`Bearer ${accessToken}`
+        },
+        body:JSON.stringify({orderId})
+      });
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||'Order could not be deleted.');
+
+      if(selectedAdminOrderId===orderId)selectedAdminOrderId=null;
+      await refreshAdminOrders(client);
+      showToast(`${orderNumber} permanently deleted.`);
+    }catch(error){
+      console.error('Unable to delete order.',error);
+      showToast(error.message||'Order could not be deleted.');
+      button.disabled=false;
+      button.textContent=originalText;
+    }
+  }));
   container.querySelectorAll('[data-order-status]').forEach(select=>select.addEventListener('change',async()=>{
     const orderId=select.dataset.orderStatus;
     const nextStatus=select.value;
