@@ -770,3 +770,26 @@ document.getElementById('newsletter-form').addEventListener('submit',e=>{e.preve
 document.getElementById('year').textContent=new Date().getFullYear();
 window.addEventListener('hashchange',route);window.addEventListener('popstate',route);setupGlobalCommerceActions();renderBag();route();
 window.addEventListener('load',()=>{setTimeout(()=>document.getElementById('loading-screen').classList.add('done'),100);});setTimeout(()=>document.getElementById('loading-screen').classList.add('done'),2800);
+
+
+// Persistent WhatsApp contact button
+(function addWjNoirWhatsAppButton() {
+  if (document.getElementById('wj-noir-whatsapp')) return;
+  const link = document.createElement('a');
+  link.id = 'wj-noir-whatsapp';
+  link.href = 'https://wa.me/923363549666?text=' + encodeURIComponent("Assalam-o-Alaikum WJ NOIR! I'd like to know more about your fragrances and placing an order.");
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.setAttribute('aria-label', 'Chat with WJ NOIR on WhatsApp');
+  link.title = 'Chat with WJ NOIR on WhatsApp';
+  link.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16.04 3.2A12.7 12.7 0 0 0 5.1 22.35L3.3 28.9l6.7-1.76A12.7 12.7 0 1 0 16.04 3.2Zm0 23.1c-2 0-3.96-.54-5.67-1.57l-.4-.24-3.98 1.05 1.06-3.88-.26-.4a10.35 10.35 0 1 1 9.25 5.04Zm5.68-7.75c-.31-.16-1.85-.91-2.14-1.01-.29-.11-.5-.16-.71.16-.21.31-.81 1.01-.99 1.22-.18.21-.36.24-.67.08-.31-.16-1.3-.48-2.47-1.52-.91-.81-1.53-1.81-1.71-2.12-.18-.31-.02-.48.14-.64.14-.14.31-.36.47-.54.16-.18.21-.31.31-.52.1-.21.05-.39-.03-.55-.08-.16-.71-1.71-.97-2.34-.26-.62-.52-.54-.71-.55h-.6c-.21 0-.55.08-.84.39-.29.31-1.1 1.07-1.1 2.61s1.13 3.03 1.28 3.24c.16.21 2.22 3.39 5.38 4.75.75.32 1.34.51 1.8.65.76.24 1.45.21 2 .13.61-.09 1.85-.76 2.11-1.49.26-.73.26-1.35.18-1.49-.08-.13-.29-.21-.6-.36Z"/></svg>';
+  link.style.cssText = 'position:fixed;right:22px;bottom:22px;z-index:9999;width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#25D366;color:#fff;box-shadow:0 8px 28px rgba(0,0,0,.28);transition:transform .2s ease,box-shadow .2s ease;text-decoration:none;';
+  const icon = link.querySelector('svg');
+  icon.style.cssText = 'width:31px;height:31px;display:block;';
+  link.addEventListener('mouseenter', () => { link.style.transform = 'translateY(-3px) scale(1.04)'; link.style.boxShadow = '0 12px 32px rgba(0,0,0,.34)'; });
+  link.addEventListener('mouseleave', () => { link.style.transform = ''; link.style.boxShadow = '0 8px 28px rgba(0,0,0,.28)'; });
+  document.body.appendChild(link);
+  const mobileStyle = document.createElement('style');
+  mobileStyle.textContent = '@media(max-width:600px){#wj-noir-whatsapp{right:16px!important;bottom:16px!important;width:54px!important;height:54px!important}#wj-noir-whatsapp svg{width:29px!important;height:29px!important}}';
+  document.head.appendChild(mobileStyle);
+})();
