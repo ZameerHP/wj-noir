@@ -29,12 +29,38 @@ let selectedAdminOrderId=null;
 let checkoutSubmitting=false;
 let adminTriggerClicks=0;
 let adminTriggerTimeout;
-let activeSale=null;
+let activeSale = {
+  id: 'active',
+  is_active: true,
+  campaign_title: '11.11 BIG SALE',
+  discount_percentage: 16.67,
+  target_type: 'all',
+  target_category: 'FOR HIM',
+  target_product_ids: ['the-office', 'ice-desire', 'levoria'],
+  start_date: null,
+  end_date: null,
+  banner_image: '/assets/wj-noir-11-11-sale-banner.jpg',
+  custom_prices: {
+    'the-office': 2499,
+    'ice-desire': 2082,
+    'levoria': 1999
+  }
+};
 let saleCountdownInterval=null;
 let salePopupTimer=null;
 
 try {
-  activeSale = JSON.parse(localStorage.getItem('wj-noir-sale-settings-cache') || 'null');
+  const cached = JSON.parse(localStorage.getItem('wj-noir-sale-settings-cache') || 'null');
+  if (cached && typeof cached === 'object') {
+    activeSale = {
+      ...activeSale,
+      ...cached,
+      custom_prices: {
+        ...activeSale.custom_prices,
+        ...(cached.custom_prices || {})
+      }
+    };
+  }
 } catch(e) {}
 
 function getProductPricing(p){
@@ -50,6 +76,19 @@ function getProductPricing(p){
   if(activeSale.end_date && new Date(activeSale.end_date) < now){
     return { isSale:false, originalPrice:orig, finalPrice:orig, discountPercent:0 };
   }
+
+  // 1. Separate custom product sale price
+  if(activeSale.custom_prices && activeSale.custom_prices[p.id] !== undefined && activeSale.custom_prices[p.id] !== null){
+    const customVal = Number(activeSale.custom_prices[p.id]);
+    if(customVal > 0 && customVal < orig){
+      const discount = Math.round(((orig - customVal) / orig) * 100);
+      return { isSale:true, originalPrice:orig, finalPrice:customVal, discountPercent:discount };
+    } else if(customVal >= orig){
+      return { isSale:false, originalPrice:orig, finalPrice:orig, discountPercent:0 };
+    }
+  }
+
+  // 2. Scoped percentage fallback
   let applies = false;
   if(activeSale.target_type === 'all'){
     applies = true;
@@ -75,8 +114,14 @@ async function fetchSaleSettings(){
     const client = await getSupabase();
     const { data, error } = await client.from('sale_settings').select('*').eq('id', 'active').maybeSingle();
     if(!error && data){
-      activeSale = data;
-      try { localStorage.setItem('wj-noir-sale-settings-cache', JSON.stringify(data)); } catch(e){}
+      activeSale = {
+        ...activeSale,
+        ...data,
+        custom_prices: (data.custom_prices && typeof data.custom_prices === 'object')
+          ? data.custom_prices
+          : (activeSale?.custom_prices || { 'the-office': 2499, 'ice-desire': 2082, 'levoria': 1999 })
+      };
+      try { localStorage.setItem('wj-noir-sale-settings-cache', JSON.stringify(activeSale)); } catch(e){}
       renderBag();
       route();
       checkAndShowSalePopup();
@@ -265,10 +310,28 @@ function compressImageFile(file, maxWidth = 1200, maxHeight = 1600, quality = 0.
   });
 }
 
+function isSalePopupDismissed(){
+  try {
+    const dismissedAt = localStorage.getItem('wj-noir-sale-popup-dismissed-at');
+    if(!dismissedAt) return false;
+    const past = Number(dismissedAt);
+    if(isNaN(past)) return false;
+    return (Date.now() - past) < (24 * 60 * 60 * 1000);
+  } catch(e) {
+    return false;
+  }
+}
+
+function markSalePopupDismissed(){
+  try {
+    localStorage.setItem('wj-noir-sale-popup-dismissed-at', String(Date.now()));
+  } catch(e) {}
+}
+
 function renderAndOpenSalePopup(){
   if(routePath() !== '/') return;
   if(!activeSale || !activeSale.is_active) return;
-  if(sessionStorage.getItem('wj-noir-sale-popup-dismissed') === 'true') return;
+  if(isSalePopupDismissed()) return;
   if(document.getElementById('sale-popup-modal')) return;
 
   const bannerSrc = activeSale.banner_image || '/assets/wj-noir-11-11-sale-banner.jpg';
@@ -276,26 +339,62 @@ function renderAndOpenSalePopup(){
   modal.id = 'sale-popup-modal';
   modal.className = 'sale-popup-overlay';
   modal.innerHTML = `
-    <div class="sale-popup-backdrop" data-close-sale-popup></div>
-    <div class="sale-popup-container" role="dialog" aria-modal="true" aria-label="Special Sale Announcement">
+    <div class="sale-popup-backdrop" data-close-sale-popup aria-label="Dismiss sale popup"></div>
+    <div class="sale-popup-container" role="dialog" aria-modal="true" aria-label="11.11 Big Sale Announcement">
       <button type="button" class="sale-popup-close" data-close-sale-popup aria-label="Close sale announcement">×</button>
-      <a href="/shop" class="sale-popup-image-wrap" data-close-sale-popup aria-label="Discover the sale collection">
-        <img src="${bannerSrc}" alt="${escapeHtml(activeSale.campaign_title || 'WJ NOIR Special Sale')}"/>
+      <a href="/shop" class="sale-popup-image-wrap" data-close-sale-popup aria-label="Shop the 11.11 Big Sale">
+        <img src="${bannerSrc}" alt="${escapeHtml(activeSale.campaign_title || '11.11 Big Sale')}" loading="eager"/>
       </a>
       <div class="sale-popup-footer">
-        <a href="/shop" class="button dark-btn sale-popup-btn" data-close-sale-popup>SHOP THE SALE <span>↗</span></a>
+        <span class="sale-popup-kicker">LIMITED TIME · 11.11</span>
+        <a href="/shop" class="sale-popup-btn" data-close-sale-popup>
+          <span>SHOP THE SALE</span>
+          <span class="popup-btn-arrow" aria-hidden="true">↗</span>
+        </a>
+        <button type="button" class="sale-popup-no-thanks" data-close-sale-popup>No thanks</button>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
+  document.body.classList.add('lock-scroll');
+
   requestAnimationFrame(() => modal.classList.add('is-open'));
 
   const dismiss = () => {
     modal.classList.remove('is-open');
-    sessionStorage.setItem('wj-noir-sale-popup-dismissed', 'true');
-    setTimeout(() => modal.remove(), 420);
+    markSalePopupDismissed();
+    document.body.classList.remove('lock-scroll');
+    document.removeEventListener('keydown', handleKeyDown);
+    setTimeout(() => {
+      if(modal.parentNode) modal.parentNode.removeChild(modal);
+    }, 260);
   };
+
+  const handleKeyDown = (e) => {
+    if(e.key === 'Escape'){
+      dismiss();
+    } else if(e.key === 'Tab'){
+      const focusables = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if(!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if(e.shiftKey && document.activeElement === first){
+        e.preventDefault();
+        last.focus();
+      } else if(!e.shiftKey && document.activeElement === last){
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  };
+
+  document.addEventListener('keydown', handleKeyDown);
   modal.querySelectorAll('[data-close-sale-popup]').forEach(btn => btn.addEventListener('click', dismiss));
+
+  setTimeout(() => {
+    const cta = modal.querySelector('.sale-popup-btn');
+    cta?.focus();
+  }, 100);
 }
 
 function checkAndShowSalePopup(){
@@ -308,14 +407,14 @@ function checkAndShowSalePopup(){
   const now = new Date();
   if(activeSale.start_date && new Date(activeSale.start_date) > now) return;
   if(activeSale.end_date && new Date(activeSale.end_date) < now) return;
-  if(sessionStorage.getItem('wj-noir-sale-popup-dismissed') === 'true') return;
+  if(isSalePopupDismissed()) return;
   if(document.getElementById('sale-popup-modal')) return;
 
-  // 5.5s delay on website open before popping up the sale image
+  // Open after ~2 seconds on page load
   salePopupTimer = setTimeout(() => {
     salePopupTimer = null;
     renderAndOpenSalePopup();
-  }, 5500);
+  }, 2000);
 }
 function setupReveals(){const els=document.querySelectorAll('.reveal'); if(reducedMotion || !('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('is-visible'));return;} const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}})},{threshold:.08,rootMargin:'0px 0px -35px 0px'});els.forEach(e=>io.observe(e));}
 function setupVideo(){
@@ -591,7 +690,13 @@ function route(){
 function closeAll(){
   document.querySelectorAll('.overlay').forEach(el=>{el.classList.remove('open');el.setAttribute('aria-hidden','true');});
   closeGalleryZoom();
-  document.body.classList.remove('lock-scroll');
+  const saleModal = document.getElementById('sale-popup-modal');
+  if(saleModal && routePath() !== '/'){
+    saleModal.remove();
+  }
+  if(!document.getElementById('sale-popup-modal')){
+    document.body.classList.remove('lock-scroll');
+  }
   document.getElementById('menu-toggle').setAttribute('aria-expanded','false');
   document.getElementById('search-toggle').setAttribute('aria-expanded','false');
 }
@@ -828,9 +933,21 @@ function renderAdminSaleSectionMarkup(){
     target_category: 'FOR HIM',
     target_product_ids: ['the-office', 'ice-desire', 'levoria'],
     start_date: null,
-    end_date: null
+    end_date: null,
+    banner_image: '/assets/wj-noir-11-11-sale-banner.jpg',
+    custom_prices: {
+      'the-office': 2499,
+      'ice-desire': 2082,
+      'levoria': 1999
+    }
   };
   const customIds = Array.isArray(s.target_product_ids) ? s.target_product_ids : ['the-office', 'ice-desire', 'levoria'];
+  const customPrices = (s.custom_prices && typeof s.custom_prices === 'object') ? s.custom_prices : {
+    'the-office': 2499,
+    'ice-desire': 2082,
+    'levoria': 1999
+  };
+
   return `
     <section class="admin-sale-section" id="admin-sale-section">
       <div class="admin-sale-header">
@@ -852,7 +969,7 @@ function renderAdminSaleSectionMarkup(){
           <input id="admin-sale-title" value="${escapeHtml(s.campaign_title || '11.11 BIG SALE')}" placeholder="e.g. 11.11 BIG SALE"/>
         </div>
         <div class="admin-sale-field">
-          <label for="admin-sale-discount">Discount %</label>
+          <label for="admin-sale-discount">Discount % (Bulk Formula)</label>
           <input type="number" step="0.01" min="0" max="100" id="admin-sale-discount" value="${s.discount_percentage ?? 16.67}" placeholder="e.g. 16.67 or 50"/>
         </div>
         <div class="admin-sale-field">
@@ -893,12 +1010,12 @@ function renderAdminSaleSectionMarkup(){
           <input type="datetime-local" id="admin-sale-end" value="${formatForDateTimeLocal(s.end_date)}"/>
         </div>
         <div class="admin-sale-field admin-sale-field--full">
-          <label>Sale Popup Image (5-6s Website Entry)</label>
+          <label>Sale Popup Image (Ultra-Luxury Modal on Website Entry)</label>
           <div class="admin-banner-preview-box">
             <img id="admin-sale-banner-preview" class="admin-banner-thumb" src="${escapeHtml(s.banner_image || '/assets/wj-noir-11-11-sale-banner.jpg')}" alt="Sale Banner Preview"/>
             <div class="admin-banner-controls">
               <strong>Active Popup Graphic</strong>
-              <p style="font-size:12px;color:#78766e;margin:0 0 6px">This image pops up automatically 5 to 6 seconds after a visitor enters the website. Upload any new campaign poster or graphic.</p>
+              <p style="font-size:12px;color:#78766e;margin:0 0 6px">This poster is presented inside the ultra-luxury popup 2 seconds after a visitor lands on the homepage. Upload any new campaign artwork or reset to the 11.11 poster.</p>
               <div class="admin-banner-actions">
                 <input type="file" id="admin-sale-banner-file" accept="image/png, image/jpeg, image/webp" style="display:none"/>
                 <button type="button" id="admin-banner-upload-trigger" class="button admin-banner-btn">📁 UPLOAD NEW IMAGE</button>
@@ -909,6 +1026,35 @@ function renderAdminSaleSectionMarkup(){
           </div>
         </div>
       </div>
+
+      <div class="admin-separate-prices">
+        <div class="admin-separate-prices-header">
+          <div>
+            <h3>Separate Product Sale Prices (PKR)</h3>
+            <p>Customize individual sale prices separately per product, or click auto-calculate from the bulk discount %.</p>
+          </div>
+          <button type="button" id="admin-autocalc-prices" class="button outline-btn" style="padding:6px 14px;font-size:11px;cursor:pointer">⚡ Auto-Calculate from Discount %</button>
+        </div>
+        <div class="admin-separate-prices-grid">
+          ${fragrances.map(p => {
+            const currentPrice = customPrices[p.id] !== undefined ? customPrices[p.id] : (p.id === 'levoria' ? 1999 : Math.round(p.price * (1 - (s.discount_percentage || 16.67) / 100)));
+            return `
+              <div class="admin-price-card">
+                <div class="admin-price-card-title">
+                  <span>${escapeHtml(p.title)}</span>
+                  <span class="admin-price-card-orig">Orig: PKR ${p.price.toLocaleString('en-PK')}</span>
+                </div>
+                <div class="admin-price-card-input-wrap">
+                  <span>PKR</span>
+                  <input type="number" step="1" min="1" max="99999" id="admin-price-input-${p.id}" class="admin-custom-price-input" data-product-id="${p.id}" value="${currentPrice}"/>
+                </div>
+                <span class="admin-price-card-savings" id="admin-price-savings-${p.id}" style="font-size:11px;color:#8c897f"></span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
       <div class="sale-preview-wrap">
         <h3>Live Calculated Preview</h3>
         <table class="sale-preview-table">
@@ -917,7 +1063,7 @@ function renderAdminSaleSectionMarkup(){
               <th>Product</th>
               <th>Category</th>
               <th>Original Price</th>
-              <th>Calculated Sale Price</th>
+              <th>Effective Sale Price</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -944,6 +1090,8 @@ function setupAdminSaleControls(client){
   const categorySelect = document.getElementById('admin-sale-category');
   const customWrap = document.getElementById('admin-custom-products-wrap');
   const customChecks = document.querySelectorAll('.admin-custom-product-check');
+  const customPriceInputs = document.querySelectorAll('.admin-custom-price-input');
+  const autoCalcBtn = document.getElementById('admin-autocalc-prices');
   const previewTbody = document.getElementById('admin-sale-preview-tbody');
   const saveBtn = document.getElementById('admin-save-sale');
 
@@ -989,6 +1137,32 @@ function setupAdminSaleControls(client){
     showToast('Reset to 11.11 poster. Click SAVE SALE SETTINGS to publish.');
   });
 
+  const getCustomPricesFromInputs = () => {
+    const prices = {};
+    customPriceInputs.forEach(input => {
+      const pid = input.dataset.productId;
+      const val = Number(input.value);
+      if(pid && val > 0){
+        prices[pid] = val;
+      }
+    });
+    return prices;
+  };
+
+  autoCalcBtn?.addEventListener('click', () => {
+    const discount = Math.max(0, Math.min(100, Number(discountInput.value) || 0));
+    customPriceInputs.forEach(input => {
+      const pid = input.dataset.productId;
+      const prod = fragrances.find(p => p.id === pid);
+      if(prod){
+        const newPrice = Math.round(prod.price * (1 - (discount / 100)));
+        input.value = newPrice;
+      }
+    });
+    updatePreview();
+    showToast(`Recalculated prices from ${discount}% discount.`);
+  });
+
   const updatePreview = () => {
     const isChecked = toggle.checked;
     toggleLabel.textContent = isChecked ? 'SALE IS ON' : 'SALE IS OFF';
@@ -1000,6 +1174,28 @@ function setupAdminSaleControls(client){
 
     const selectedCategory = categorySelect.value;
     const selectedCustomIds = [...customChecks].filter(c => c.checked).map(c => c.value);
+    const enteredPrices = getCustomPricesFromInputs();
+
+    fragrances.forEach(p => {
+      const savingsEl = document.getElementById(`admin-price-savings-${p.id}`);
+      if(savingsEl){
+        const entered = enteredPrices[p.id];
+        if(entered && entered < p.price){
+          const diff = p.price - entered;
+          const pct = Math.round((diff / p.price) * 100);
+          savingsEl.textContent = `-${pct}% off (Saves PKR ${diff.toLocaleString('en-PK')})`;
+          savingsEl.style.color = '#a8803a';
+        } else if(entered && entered === p.price){
+          savingsEl.textContent = 'Regular Price (No discount)';
+          savingsEl.style.color = '#8c897f';
+        } else if(entered && entered > p.price){
+          savingsEl.textContent = 'Higher than regular price';
+          savingsEl.style.color = '#c2410c';
+        } else {
+          savingsEl.textContent = '';
+        }
+      }
+    });
 
     previewTbody.innerHTML = fragrances.map(p => {
       let applies = false;
@@ -1008,16 +1204,28 @@ function setupAdminSaleControls(client){
         else if(selectedScope === 'category') applies = p.category === selectedCategory;
         else if(selectedScope === 'custom') applies = selectedCustomIds.includes(p.id);
       }
-      const calculatedPrice = applies && discount > 0 ? Math.round(p.price * (1 - (discount / 100))) : p.price;
-      const statusText = !isChecked
-        ? '<span class="sale-preview-inactive">Standard (Sale OFF)</span>'
-        : (applies ? `<span class="sale-preview-active">Sale Active (-${discount}%)</span>` : '<span class="sale-preview-inactive">Standard (Excluded)</span>');
+
+      let effectivePrice = p.price;
+      let statusText = '';
+
+      if(!isChecked){
+        statusText = '<span class="sale-preview-inactive">Standard (Sale OFF)</span>';
+      } else if(enteredPrices[p.id] !== undefined && enteredPrices[p.id] < p.price){
+        effectivePrice = enteredPrices[p.id];
+        const pct = Math.round(((p.price - effectivePrice) / p.price) * 100);
+        statusText = `<span class="sale-preview-active">Custom Sale Price (-${pct}%)</span>`;
+      } else if(applies && discount > 0){
+        effectivePrice = Math.round(p.price * (1 - (discount / 100)));
+        statusText = `<span class="sale-preview-active">Formula Active (-${discount}%)</span>`;
+      } else {
+        statusText = '<span class="sale-preview-inactive">Standard (Excluded)</span>';
+      }
 
       return `<tr>
         <td><strong>${escapeHtml(p.title)}</strong></td>
         <td>${escapeHtml(p.category)}</td>
         <td>PKR ${p.price.toLocaleString('en-PK')}</td>
-        <td><strong>PKR ${calculatedPrice.toLocaleString('en-PK')}</strong></td>
+        <td><strong>PKR ${effectivePrice.toLocaleString('en-PK')}</strong></td>
         <td>${statusText}</td>
       </tr>`;
     }).join('');
@@ -1028,6 +1236,7 @@ function setupAdminSaleControls(client){
   scopeRadios.forEach(r => r.addEventListener('change', updatePreview));
   categorySelect.addEventListener('change', updatePreview);
   customChecks.forEach(c => c.addEventListener('change', updatePreview));
+  customPriceInputs.forEach(i => i.addEventListener('input', updatePreview));
   updatePreview();
 
   saveBtn.addEventListener('click', async () => {
@@ -1044,6 +1253,7 @@ function setupAdminSaleControls(client){
       const selectedCustomIds = [...customChecks].filter(c => c.checked).map(c => c.value);
       const startVal = document.getElementById('admin-sale-start').value;
       const endVal = document.getElementById('admin-sale-end').value;
+      const custom_prices = getCustomPricesFromInputs();
 
       const payload = {
         id: 'active',
@@ -1056,6 +1266,7 @@ function setupAdminSaleControls(client){
         start_date: startVal ? new Date(startVal).toISOString() : null,
         end_date: endVal ? new Date(endVal).toISOString() : null,
         banner_image: stagedBanner,
+        custom_prices: custom_prices,
         updated_at: new Date().toISOString()
       };
 
@@ -1065,7 +1276,8 @@ function setupAdminSaleControls(client){
       activeSale = payload;
       try { localStorage.setItem('wj-noir-sale-settings-cache', JSON.stringify(payload)); } catch(e){}
       renderBag();
-      showToast(isChecked ? `Sale settings saved. Sale is ON (${discount}% off).` : 'Sale settings saved. Sale is OFF.');
+      route();
+      showToast(isChecked ? 'Sale settings saved. Prices updated successfully sitewide.' : 'Sale settings saved. Sale is OFF.');
       updatePreview();
     } catch(err) {
       console.error('Unable to save sale settings.', err);
