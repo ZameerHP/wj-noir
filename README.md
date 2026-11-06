@@ -48,6 +48,7 @@ The storefront includes a local-storage cart, quantity controls, Buy Now checkou
    - The migration allowlists `wjnoir@gmail.com`, the email already supplied for WJ NOIR. If another address should administer orders, change that email in the migration before running it or update the `admin_allowlist` row afterward.
    - Orders and items have RLS enabled. Anonymous visitors can create orders only through the validated `create_order` RPC; they cannot read, update, or delete orders. Only authenticated allowlisted admins can read or update them.
    The migration uses Vault secrets and `net.http_post` for the post-insert email notification.
+   - Run [`supabase/migrations/202611060001_sale_system.sql`](./supabase/migrations/202611060001_sale_system.sql) to enable the Synced Sale & Discount System, creating `public.sale_settings` and updating the tamper-proof `create_order` pricing engine.
 4. In **Authentication → Users**, create the allowlisted admin account yourself and set its password. Disable public signups in the Supabase Auth settings; the storefront has no signup page.
 
 ### 2. Verify the Resend sending domain

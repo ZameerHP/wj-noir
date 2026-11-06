@@ -29,8 +29,73 @@ let selectedAdminOrderId=null;
 let checkoutSubmitting=false;
 let adminTriggerClicks=0;
 let adminTriggerTimeout;
+let activeSale=null;
+let saleCountdownInterval=null;
+
+try {
+  activeSale = JSON.parse(localStorage.getItem('wj-noir-sale-settings-cache') || 'null');
+} catch(e) {}
+
+function getProductPricing(p){
+  if(!p) return { isSale:false, originalPrice:0, finalPrice:0, discountPercent:0 };
+  const orig = Number(p.price) || 0;
+  if(!activeSale || !activeSale.is_active){
+    return { isSale:false, originalPrice:orig, finalPrice:orig, discountPercent:0 };
+  }
+  const now = new Date();
+  if(activeSale.start_date && new Date(activeSale.start_date) > now){
+    return { isSale:false, originalPrice:orig, finalPrice:orig, discountPercent:0 };
+  }
+  if(activeSale.end_date && new Date(activeSale.end_date) < now){
+    return { isSale:false, originalPrice:orig, finalPrice:orig, discountPercent:0 };
+  }
+  let applies = false;
+  if(activeSale.target_type === 'all'){
+    applies = true;
+  } else if(activeSale.target_type === 'category'){
+    applies = activeSale.target_category === p.category;
+  } else if(activeSale.target_type === 'custom'){
+    const list = Array.isArray(activeSale.target_product_ids) ? activeSale.target_product_ids : [];
+    applies = list.includes(p.id);
+  }
+  if(!applies){
+    return { isSale:false, originalPrice:orig, finalPrice:orig, discountPercent:0 };
+  }
+  const discount = Math.max(0, Math.min(100, Number(activeSale.discount_percentage) || 0));
+  if(discount <= 0){
+    return { isSale:false, originalPrice:orig, finalPrice:orig, discountPercent:0 };
+  }
+  const finalPrice = Math.round(orig * (1 - (discount / 100)));
+  return { isSale:true, originalPrice:orig, finalPrice, discountPercent:discount };
+}
+
+async function fetchSaleSettings(){
+  try {
+    const client = await getSupabase();
+    const { data, error } = await client.from('sale_settings').select('*').eq('id', 'active').maybeSingle();
+    if(!error && data){
+      activeSale = data;
+      try { localStorage.setItem('wj-noir-sale-settings-cache', JSON.stringify(data)); } catch(e){}
+      renderBag();
+      route();
+      checkAndShowSalePopup();
+      return;
+    }
+  } catch(err) {
+    // Falls back to cached activeSale
+  }
+  if(activeSale){
+    renderBag();
+    route();
+    checkAndShowSalePopup();
+  }
+}
+
 const cartQuantity = () => cart.reduce((total,item)=>total+item.quantity,0);
-const cartSubtotal = items => items.reduce((total,item)=>total+(fragrances.find(p=>p.id===item.id)?.price||0)*item.quantity,0);
+const cartSubtotal = items => items.reduce((total,item)=>{
+  const p = fragrances.find(prod=>prod.id===item.id);
+  return total + (getProductPricing(p).finalPrice)*item.quantity;
+},0);
 function saveCart(){
   try { localStorage.setItem(cartStorageKey,JSON.stringify(cart)); }
   catch(error) { console.error('Unable to persist the WJ NOIR cart.',error); showToast('Your cart could not be saved on this device.'); }
@@ -38,7 +103,33 @@ function saveCart(){
 }
 const arrow = `<span class="arrow-icon" aria-hidden="true">↗</span>`;
 const buttonLink = (href, title, variant='light') => `<a class="button ${variant === 'light' ? 'light-btn' : 'outline-btn'}" href="${href}"><span>${title}</span>${arrow}</a>`;
-function card(p, extra='', reveal=true) { return `<article class="product-card ${extra} ${reveal?'reveal':''}"><a class="product-image-wrap" href="/fragrance/${p.id}" aria-label="Discover ${escapeHtml(p.title)}"><img loading="lazy" decoding="async" src="${ASSET+p.image}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/><span class="product-hover">DISCOVER FRAGRANCE ↗</span><span class="product-number">${p.number} / 03</span></a><div class="product-card-info"><div><span class="eyebrow">${p.category} · EAU DE PARFUM</span><h3>${escapeHtml(p.title)}</h3><p>${p.tagline}</p>${p.showPrice?`<p class="product-card-price">PKR ${p.price.toLocaleString('en-PK')}</p>`:''}</div><a class="round-arrow" aria-label="View ${escapeHtml(p.title)}" href="/fragrance/${p.id}">↗</a></div></article>`; }
+function card(p, extra='', reveal=true) {
+  const pricing = getProductPricing(p);
+  const priceMarkup = pricing.isSale
+    ? `<p class="product-card-price"><span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <strong class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</strong></p>`
+    : (p.showPrice ? `<p class="product-card-price">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</p>` : '');
+  const badge = pricing.isSale
+    ? `<span class="sale-badge">-${Math.round(pricing.discountPercent)}%</span>`
+    : '';
+
+  return `<article class="product-card ${extra} ${reveal?'reveal':''}">
+    <a class="product-image-wrap" href="/fragrance/${p.id}" aria-label="Discover ${escapeHtml(p.title)}">
+      <img loading="lazy" decoding="async" src="${ASSET+p.image}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/>
+      ${badge}
+      <span class="product-hover">DISCOVER FRAGRANCE ↗</span>
+      <span class="product-number">${p.number} / 03</span>
+    </a>
+    <div class="product-card-info">
+      <div>
+        <span class="eyebrow">${p.category} · EAU DE PARFUM</span>
+        <h3>${escapeHtml(p.title)}</h3>
+        <p>${p.tagline}</p>
+        ${priceMarkup}
+      </div>
+      <a class="round-arrow" aria-label="View ${escapeHtml(p.title)}" href="/fragrance/${p.id}">↗</a>
+    </div>
+  </article>`;
+}
 function home() { return `
   <main>
     <section class="hero" id="hero" aria-label="WJ NOIR fragrance film campaign"><div class="hero-video-wrap"><video id="hero-video" class="hero-video" muted loop playsinline preload="none" poster="${ASSET}the-office-poster.jpg"><source src="${ASSET}the-office-hero.mp4" type="video/mp4"/></video></div><div class="hero-shade"></div><div class="hero-noise"></div><div class="hero-top-copy"><p class="hero-intro animate-in">For those who choose their own way.<br/>Your presence. Your signature. Your rules.</p></div><div class="hero-proof animate-in" aria-label="Three signature fragrances"><div class="hero-fragrance-orbit"><img src="${ASSET}wj-noir-the-office.jpg" alt="" decoding="async" fetchpriority="low"/><img src="${ASSET}wj-noir-ice-desire.jpg" alt="" decoding="async" fetchpriority="low"/><img src="${ASSET}wj-noir-levoria.jpg" alt="" decoding="async" fetchpriority="low"/></div><p>THREE SIGNATURES.<br/>ONE UNMISTAKABLE PRESENCE.</p></div><div class="hero-content"><p class="eyebrow hero-kicker animate-in"><span class="line-accent"></span>THE WORLD OF WJ NOIR <span class="kicker-index">— 001</span></p><h1 class="animate-in hero-heading">WEAR YOUR<br/><em>PRESENCE.</em></h1><p class="hero-description animate-in">An entrance you feel.<br/>An impression that stays.</p></div><div class="hero-actions animate-in">${buttonLink('/about','DISCOVER THE HOUSE','outline')}${buttonLink('/shop','SHOP THE COLLECTION')}</div><div class="hero-bottom"><span class="hero-scroll">SCROLL TO DISCOVER <span class="scroll-line"></span></span><span>01 / 03 — THE SIGNATURE COLLECTION</span><span class="hero-video-mark">FILM 001&nbsp; ↗</span></div></section>
@@ -69,12 +160,24 @@ function product(p) {
           <img class="product-image-zoom-image" alt=""/>
         </div>
       </div>`;
+  const pricing = getProductPricing(p);
+  const priceDisplayMarkup = pricing.isSale
+    ? `<div class="product-detail-price-wrap">
+        <div class="product-detail-prices">
+          <span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span>
+          <strong class="product-detail-price price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</strong>
+        </div>
+        <span class="sale-urgency-badge"><span class="sale-urgency-icon">⏳</span> Limited Time Offer</span>
+      </div>
+      ${activeSale?.end_date ? `<div id="sale-countdown" class="sale-countdown" data-end="${escapeHtml(activeSale.end_date)}"></div>` : ''}`
+    : (p.showPrice ? `<p class="product-detail-price">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</p>` : '');
+
   const infoMarkup = `<div class="product-info product-info--editorial">
         <div class="product-overview">
           <span class="eyebrow ink-muted">${p.category} / WJ NOIR</span>
           <h1>${escapeHtml(p.upper)}</h1>
           <p class="product-summary">${escapeHtml(p.description)}</p>
-          ${p.showPrice?`<p class="product-detail-price">PKR ${p.price.toLocaleString('en-PK')}</p>`:''}
+          ${priceDisplayMarkup}
           <p class="product-volume product-volume--compact">50 ml <span aria-hidden="true">·</span> Eau de Parfum</p>
         </div>
         <div class="product-purchase">
@@ -94,12 +197,84 @@ function product(p) {
         </div>
       </div>`;
   const stickyPurchase = `<div class="product-sticky-purchase" aria-hidden="true">
-        <span class="product-sticky-price">PKR ${p.price.toLocaleString('en-PK')}</span>
+        <span class="product-sticky-price">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</span>
         <button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}" tabindex="-1">BUY NOW <span>↗</span></button>
       </div>`;
   return `<main class="interior-page product-page product-page--premium"><section class="product-detail-layout">${galleryMarkup}${infoMarkup}</section>${stickyPurchase}<section class="product-film" aria-label="${escapeHtml(p.title)} fragrance film"><video class="product-film-video" muted loop playsinline preload="none" poster="${ASSET+filmPoster}" aria-label="Cinematic WJ NOIR ${escapeHtml(p.title)} perfume film"><source src="${ASSET+film}" type="video/mp4"/></video></section><section class="related-products section-pad"><div class="section-heading-row"><div><span class="eyebrow ink-muted">CONTINUE EXPLORING</span><h2>YOU MAY ALSO <em>LOVE.</em></h2></div><a class="text-link" href="/shop">VIEW ALL <span>↗</span></a></div><div class="products-grid related-grid">${related.map(other=>card(other)).join('')}</div></section></main>`;
 }
 function notFound(){return `<main class="not-found"><span class="eyebrow">PAGE NOT FOUND</span><h1>Lost your <em>scent?</em></h1><a class="button dark-btn" href="/">RETURN HOME <span>↗</span></a></main>`;}
+
+function setupCountdownTimer(){
+  if(saleCountdownInterval){
+    clearInterval(saleCountdownInterval);
+    saleCountdownInterval=null;
+  }
+  const el=document.getElementById('sale-countdown');
+  if(!el||!el.dataset.end) return;
+  const target=new Date(el.dataset.end).getTime();
+  if(isNaN(target)) return;
+
+  const update=()=>{
+    const diff=target-Date.now();
+    if(diff<=0){
+      el.innerHTML='<span class="sale-countdown-label">OFFER EXPIRED</span>';
+      clearInterval(saleCountdownInterval);
+      saleCountdownInterval=null;
+      return;
+    }
+    const d=Math.floor(diff/(1000*60*60*24));
+    const h=Math.floor((diff/(1000*60*60))%24);
+    const m=Math.floor((diff/(1000*60))%60);
+    const s=Math.floor((diff/1000)%60);
+    const pad=n=>String(n).padStart(2,'0');
+    el.innerHTML=`
+      <span class="sale-countdown-label">ENDS IN</span>
+      <span class="sale-countdown-timer">${d>0?`${pad(d)}D : `:''}${pad(h)}H : ${pad(m)}M : ${pad(s)}S</span>
+    `;
+  };
+  update();
+  saleCountdownInterval=setInterval(update,1000);
+}
+
+function checkAndShowSalePopup(){
+  if(routePath()!=='/') return;
+  if(!activeSale||!activeSale.is_active) return;
+  const now=new Date();
+  if(activeSale.start_date&&new Date(activeSale.start_date)>now) return;
+  if(activeSale.end_date&&new Date(activeSale.end_date)<now) return;
+  if(sessionStorage.getItem('wj-noir-sale-popup-dismissed')==='true') return;
+  if(document.getElementById('sale-popup-modal')) return;
+
+  const discountVal=Number(activeSale.discount_percentage)||16.67;
+  const discountText=`FLAT ${discountVal}% OFF`;
+  const modal=document.createElement('div');
+  modal.id='sale-popup-modal';
+  modal.className='sale-popup-overlay';
+  modal.innerHTML=`
+    <div class="sale-popup-backdrop" data-close-sale-popup></div>
+    <div class="sale-popup-container" role="dialog" aria-modal="true" aria-label="Special Sale">
+      <button type="button" class="sale-popup-close" data-close-sale-popup aria-label="Close sale announcement">×</button>
+      <div class="sale-popup-banner">
+        <img src="${activeSale.banner_image||'/assets/wj-noir-11-11-sale-banner.jpg'}" alt="WJ NOIR Sale Campaign"/>
+      </div>
+      <div class="sale-popup-body">
+        <span class="eyebrow">${escapeHtml(activeSale.campaign_title||'11.11 BIG SALE')}</span>
+        <h2>${escapeHtml(discountText)}</h2>
+        <p>Experience our signature Eau de Parfum creations at exclusive pricing. Limited time only.</p>
+        <a href="/shop" class="button dark-btn sale-popup-btn" data-close-sale-popup>SHOP THE SALE <span>↗</span></a>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  requestAnimationFrame(()=>modal.classList.add('is-open'));
+
+  const dismiss=()=>{
+    modal.classList.remove('is-open');
+    sessionStorage.setItem('wj-noir-sale-popup-dismissed','true');
+    setTimeout(()=>modal.remove(),420);
+  };
+  modal.querySelectorAll('[data-close-sale-popup]').forEach(btn=>btn.addEventListener('click',dismiss));
+}
 function setupReveals(){const els=document.querySelectorAll('.reveal'); if(reducedMotion || !('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('is-visible'));return;} const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}})},{threshold:.08,rootMargin:'0px 0px -35px 0px'});els.forEach(e=>io.observe(e));}
 function setupVideo(){
   const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
@@ -348,6 +523,10 @@ function navigateTo(path){history.pushState({},'',path);route();}
 function route(){
   const path=routePath();
   if(adminChannel){getSupabase().then(client=>client.removeChannel(adminChannel)).catch(error=>console.error('Unable to close the admin live-update channel.',error));adminChannel=null;}
+  if(!path.startsWith('/fragrance/') && saleCountdownInterval){
+    clearInterval(saleCountdownInterval);
+    saleCountdownInterval=null;
+  }
   const p=path.startsWith('/fragrance/')?fragrances.find(x=>x.id===path.split('/')[2]):undefined;
   document.body.classList.toggle('home-route',path==='/');
   if(path==='/checkout')app.innerHTML=checkoutPage();
@@ -356,11 +535,12 @@ function route(){
   else app.innerHTML=path==='/'?home():path==='/shop'?shop():path==='/about'?about():p?product(p):notFound();
   updateSeo(path,p);
   window.scrollTo({top:0,behavior:'instant'});
-  setupReveals();setupVideo();setupGallery();setupPurchaseControls();
+  setupReveals();setupVideo();setupGallery();setupPurchaseControls();setupCountdownTimer();
   document.querySelectorAll('[data-add]').forEach(btn=>btn.addEventListener('click',()=>addToCart(btn.dataset.add,1)));
   if(path==='/checkout')setupCheckout();
   if(path==='/admin')setupAdmin();
   closeAll();
+  checkAndShowSalePopup();
 }
 function closeAll(){
   document.querySelectorAll('.overlay').forEach(el=>{el.classList.remove('open');el.setAttribute('aria-hidden','true');});
@@ -423,7 +603,11 @@ function removeFromCart(id){cart=cart.filter(item=>item.id!==id);saveCart();}
 function cartItemMarkup(item){
   const p=fragrances.find(product=>product.id===item.id);
   if(!p)return '';
-  return `<div class="bag-item"><img src="${ASSET+p.image}" alt="${escapeHtml(p.title)}"/><div><span class="eyebrow ink-muted">EAU DE PARFUM / 50 ML</span><h3>${escapeHtml(p.title)}</h3><strong>PKR ${p.price.toLocaleString('en-PK')}</strong><div class="bag-quantity"><button type="button" data-cart-adjust="-1" data-cart-id="${p.id}" aria-label="Remove one ${escapeHtml(p.title)}">−</button><span>QTY ${item.quantity}</span><button type="button" data-cart-adjust="1" data-cart-id="${p.id}" aria-label="Add one ${escapeHtml(p.title)}">+</button></div><button type="button" data-cart-remove="${p.id}" class="remove-link">REMOVE ×</button></div></div>`;
+  const pricing = getProductPricing(p);
+  const priceDisplay = pricing.isSale
+    ? `<strong><span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <span class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</span></strong>`
+    : `<strong>PKR ${pricing.originalPrice.toLocaleString('en-PK')}</strong>`;
+  return `<div class="bag-item"><img src="${ASSET+p.image}" alt="${escapeHtml(p.title)}"/><div><span class="eyebrow ink-muted">EAU DE PARFUM / 50 ML</span><h3>${escapeHtml(p.title)}</h3>${priceDisplay}<div class="bag-quantity"><button type="button" data-cart-adjust="-1" data-cart-id="${p.id}" aria-label="Remove one ${escapeHtml(p.title)}">−</button><span>QTY ${item.quantity}</span><button type="button" data-cart-adjust="1" data-cart-id="${p.id}" aria-label="Add one ${escapeHtml(p.title)}">+</button></div><button type="button" data-cart-remove="${p.id}" class="remove-link">REMOVE ×</button></div></div>`;
 }
 function renderBag(){
   const count=cartQuantity();
@@ -442,7 +626,13 @@ function checkoutPage(){
   if(!items.length)return `<main class="commerce-page checkout-page"><span class="eyebrow ink-muted">YOUR ORDER</span><h1>Your cart is empty.</h1><p>Discover the WJ NOIR collection and choose a signature.</p><a class="button dark-btn" href="/shop">DISCOVER THE COLLECTION <span>↗</span></a></main>`;
   const rows=items.map(item=>{
     const p=fragrances.find(product=>product.id===item.id);
-    return p?`<div class="checkout-item"><img src="${ASSET+p.image}" alt=""/><div><strong>${escapeHtml(p.title)}</strong><span>50 ml · Eau de Parfum · Qty ${item.quantity}</span></div><b>PKR ${(p.price*item.quantity).toLocaleString('en-PK')}</b></div>`:'';
+    if(!p) return '';
+    const pricing = getProductPricing(p);
+    const lineTotal = pricing.finalPrice * item.quantity;
+    const priceDisplay = pricing.isSale
+      ? `<b><span class="price-original">PKR ${(pricing.originalPrice*item.quantity).toLocaleString('en-PK')}</span> <span class="price-sale">PKR ${lineTotal.toLocaleString('en-PK')}</span></b>`
+      : `<b>PKR ${lineTotal.toLocaleString('en-PK')}</b>`;
+    return `<div class="checkout-item"><img src="${ASSET+p.image}" alt=""/><div><strong>${escapeHtml(p.title)}</strong><span>50 ml · Eau de Parfum · Qty ${item.quantity}</span></div>${priceDisplay}</div>`;
   }).join('');
   return `<main class="commerce-page checkout-page"><a class="commerce-back-link" href="/shop">← CONTINUE EXPLORING</a><div class="commerce-heading"><span class="eyebrow ink-muted">WJ NOIR / CHECKOUT</span><h1>Complete your <em>order.</em></h1><p>We will contact you to confirm delivery details.</p></div><div class="checkout-layout"><form id="checkout-form" class="checkout-form" novalidate><h2>Delivery details</h2><div class="checkout-field"><label for="customer-name">Full name</label><input id="customer-name" name="customer_name" autocomplete="name" maxlength="120" required/></div><div class="checkout-field"><label for="customer-email">Email</label><input id="customer-email" name="email" type="email" autocomplete="email" maxlength="254" required/></div><div class="checkout-field"><label for="customer-phone">Phone number</label><input id="customer-phone" name="phone" type="tel" autocomplete="tel" maxlength="30" required/><small>Include at least 10 digits.</small></div><div class="checkout-field"><label for="customer-address">Street address</label><input id="customer-address" name="address" autocomplete="street-address" maxlength="300" required/></div><div class="checkout-field-grid"><div class="checkout-field"><label for="customer-city">City</label><input id="customer-city" name="city" autocomplete="address-level2" maxlength="100" required/></div><div class="checkout-field"><label for="customer-state">State / province</label><input id="customer-state" name="state" autocomplete="address-level1" maxlength="100" required/></div><div class="checkout-field"><label for="customer-postal-code">Postal code</label><input id="customer-postal-code" name="postal_code" autocomplete="postal-code" maxlength="20" required/></div><div class="checkout-field"><label for="customer-country">Country</label><input id="customer-country" name="country" autocomplete="country-name" maxlength="100" required/></div></div><div class="checkout-field"><label for="order-notes">Order notes <span>(optional)</span></label><textarea id="order-notes" name="notes" rows="3" maxlength="1000"></textarea></div><fieldset class="payment-choice"><legend>Payment method</legend><label><input type="radio" name="payment_method" value="Cash on Delivery" checked/><span><strong>Cash on Delivery</strong><small>Pay when your order arrives.</small></span></label></fieldset><p id="checkout-error" class="form-message" role="alert" hidden></p><button id="place-order" type="submit" class="button dark-btn checkout-submit">PLACE ORDER · PKR ${cartSubtotal(items).toLocaleString('en-PK')}</button></form><aside class="checkout-summary"><h2>Order summary</h2>${rows}<div class="checkout-total"><span>Total</span><strong>PKR ${cartSubtotal(items).toLocaleString('en-PK')}</strong></div><p>50 ml · Eau de Parfum</p></aside></div></main>`;
 }
@@ -573,11 +763,248 @@ async function refreshAdminOrders(client){
   adminOrders=data||[];
   renderAdminDashboard(client);
 }
+function formatForDateTimeLocal(isoString){
+  if(!isoString) return '';
+  try {
+    const d=new Date(isoString);
+    if(isNaN(d.getTime())) return '';
+    const pad=n=>String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch(e){ return ''; }
+}
+
+function renderAdminSaleSectionMarkup(){
+  const s = activeSale || {
+    is_active: false,
+    campaign_title: '11.11 BIG SALE',
+    discount_percentage: 16.67,
+    target_type: 'all',
+    target_category: 'FOR HIM',
+    target_product_ids: ['the-office', 'ice-desire', 'levoria'],
+    start_date: null,
+    end_date: null
+  };
+  const customIds = Array.isArray(s.target_product_ids) ? s.target_product_ids : ['the-office', 'ice-desire', 'levoria'];
+  return `
+    <section class="admin-sale-section" id="admin-sale-section">
+      <div class="admin-sale-header">
+        <div>
+          <span class="eyebrow ink-muted">WJ NOIR / BULK CONTROL</span>
+          <h2>Sale Settings</h2>
+        </div>
+        <div class="sale-switch-wrap">
+          <span class="sale-switch-label" id="sale-toggle-status-label">${s.is_active ? 'SALE IS ON' : 'SALE IS OFF'}</span>
+          <label class="sale-switch" aria-label="Master Sale Toggle">
+            <input type="checkbox" id="admin-sale-toggle" ${s.is_active ? 'checked' : ''}/>
+            <span class="sale-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="admin-sale-form">
+        <div class="admin-sale-field">
+          <label for="admin-sale-title">Campaign Headline</label>
+          <input id="admin-sale-title" value="${escapeHtml(s.campaign_title || '11.11 BIG SALE')}" placeholder="e.g. 11.11 BIG SALE"/>
+        </div>
+        <div class="admin-sale-field">
+          <label for="admin-sale-discount">Discount %</label>
+          <input type="number" step="0.01" min="0" max="100" id="admin-sale-discount" value="${s.discount_percentage ?? 16.67}" placeholder="e.g. 16.67 or 50"/>
+        </div>
+        <div class="admin-sale-field">
+          <label>Apply To</label>
+          <div class="admin-scope-options">
+            <label class="admin-scope-radio">
+              <input type="radio" name="admin-sale-scope" value="all" ${s.target_type === 'all' ? 'checked' : ''}/>
+              <span>All Products</span>
+            </label>
+            <label class="admin-scope-radio">
+              <input type="radio" name="admin-sale-scope" value="category" ${s.target_type === 'category' ? 'checked' : ''}/>
+              <span>Specific Category</span>
+            </label>
+            <label class="admin-scope-radio">
+              <input type="radio" name="admin-sale-scope" value="custom" ${s.target_type === 'custom' ? 'checked' : ''}/>
+              <span>Specific Selected Products</span>
+            </label>
+          </div>
+          <div id="admin-category-select-wrap" style="display:${s.target_type === 'category' ? 'block' : 'none'};margin-top:6px">
+            <select id="admin-sale-category">
+              <option value="FOR HIM" ${s.target_category === 'FOR HIM' ? 'selected' : ''}>FOR HIM (The Office, Ice Desire)</option>
+              <option value="FOR HER" ${s.target_category === 'FOR HER' ? 'selected' : ''}>FOR HER (Lévoria)</option>
+            </select>
+          </div>
+          <div id="admin-custom-products-wrap" class="admin-custom-products" style="display:${s.target_type === 'custom' ? 'flex' : 'none'}">
+            ${fragrances.map(p => `
+              <label class="admin-custom-check">
+                <input type="checkbox" class="admin-custom-product-check" value="${p.id}" ${customIds.includes(p.id) ? 'checked' : ''}/>
+                <span>${escapeHtml(p.title)}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+        <div class="admin-sale-field">
+          <label for="admin-sale-start">Start Date & Time (Optional)</label>
+          <input type="datetime-local" id="admin-sale-start" value="${formatForDateTimeLocal(s.start_date)}"/>
+          <label for="admin-sale-end" style="margin-top:10px">End Date & Time (Optional)</label>
+          <input type="datetime-local" id="admin-sale-end" value="${formatForDateTimeLocal(s.end_date)}"/>
+        </div>
+      </div>
+      <div class="sale-preview-wrap">
+        <h3>Live Calculated Preview</h3>
+        <table class="sale-preview-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Original Price</th>
+              <th>Calculated Sale Price</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="admin-sale-preview-tbody">
+          </tbody>
+        </table>
+      </div>
+      <div class="admin-sale-actions">
+        <button type="button" id="admin-save-sale" class="admin-sale-save-btn">SAVE SALE SETTINGS</button>
+      </div>
+    </section>
+  `;
+}
+
+function setupAdminSaleControls(client){
+  const section = document.getElementById('admin-sale-section');
+  if(!section) return;
+
+  const toggle = document.getElementById('admin-sale-toggle');
+  const toggleLabel = document.getElementById('sale-toggle-status-label');
+  const discountInput = document.getElementById('admin-sale-discount');
+  const scopeRadios = document.querySelectorAll('input[name="admin-sale-scope"]');
+  const categoryWrap = document.getElementById('admin-category-select-wrap');
+  const categorySelect = document.getElementById('admin-sale-category');
+  const customWrap = document.getElementById('admin-custom-products-wrap');
+  const customChecks = document.querySelectorAll('.admin-custom-product-check');
+  const previewTbody = document.getElementById('admin-sale-preview-tbody');
+  const saveBtn = document.getElementById('admin-save-sale');
+
+  const updatePreview = () => {
+    const isChecked = toggle.checked;
+    toggleLabel.textContent = isChecked ? 'SALE IS ON' : 'SALE IS OFF';
+    const discount = Math.max(0, Math.min(100, Number(discountInput.value) || 0));
+    let selectedScope = 'all';
+    scopeRadios.forEach(r => { if(r.checked) selectedScope = r.value; });
+    categoryWrap.style.display = selectedScope === 'category' ? 'block' : 'none';
+    customWrap.style.display = selectedScope === 'custom' ? 'flex' : 'none';
+
+    const selectedCategory = categorySelect.value;
+    const selectedCustomIds = [...customChecks].filter(c => c.checked).map(c => c.value);
+
+    previewTbody.innerHTML = fragrances.map(p => {
+      let applies = false;
+      if(isChecked){
+        if(selectedScope === 'all') applies = true;
+        else if(selectedScope === 'category') applies = p.category === selectedCategory;
+        else if(selectedScope === 'custom') applies = selectedCustomIds.includes(p.id);
+      }
+      const calculatedPrice = applies && discount > 0 ? Math.round(p.price * (1 - (discount / 100))) : p.price;
+      const statusText = !isChecked
+        ? '<span class="sale-preview-inactive">Standard (Sale OFF)</span>'
+        : (applies ? `<span class="sale-preview-active">Sale Active (-${discount}%)</span>` : '<span class="sale-preview-inactive">Standard (Excluded)</span>');
+
+      return `<tr>
+        <td><strong>${escapeHtml(p.title)}</strong></td>
+        <td>${escapeHtml(p.category)}</td>
+        <td>PKR ${p.price.toLocaleString('en-PK')}</td>
+        <td><strong>PKR ${calculatedPrice.toLocaleString('en-PK')}</strong></td>
+        <td>${statusText}</td>
+      </tr>`;
+    }).join('');
+  };
+
+  toggle.addEventListener('change', updatePreview);
+  discountInput.addEventListener('input', updatePreview);
+  scopeRadios.forEach(r => r.addEventListener('change', updatePreview));
+  categorySelect.addEventListener('change', updatePreview);
+  customChecks.forEach(c => c.addEventListener('change', updatePreview));
+  updatePreview();
+
+  saveBtn.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    const origText = saveBtn.textContent;
+    saveBtn.textContent = 'SAVING...';
+    try {
+      const isChecked = toggle.checked;
+      const title = document.getElementById('admin-sale-title').value.trim() || '11.11 BIG SALE';
+      const discount = Math.max(0, Math.min(100, Number(discountInput.value) || 0));
+      let selectedScope = 'all';
+      scopeRadios.forEach(r => { if(r.checked) selectedScope = r.value; });
+      const selectedCategory = categorySelect.value;
+      const selectedCustomIds = [...customChecks].filter(c => c.checked).map(c => c.value);
+      const startVal = document.getElementById('admin-sale-start').value;
+      const endVal = document.getElementById('admin-sale-end').value;
+
+      const payload = {
+        id: 'active',
+        is_active: isChecked,
+        campaign_title: title,
+        discount_percentage: discount,
+        target_type: selectedScope,
+        target_category: selectedScope === 'category' ? selectedCategory : null,
+        target_product_ids: selectedScope === 'custom' ? selectedCustomIds : ['the-office', 'ice-desire', 'levoria'],
+        start_date: startVal ? new Date(startVal).toISOString() : null,
+        end_date: endVal ? new Date(endVal).toISOString() : null,
+        banner_image: '/assets/wj-noir-11-11-sale-banner.jpg',
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await client.from('sale_settings').upsert(payload);
+      if(error) throw new Error(error.message);
+
+      activeSale = payload;
+      try { localStorage.setItem('wj-noir-sale-settings-cache', JSON.stringify(payload)); } catch(e){}
+      renderBag();
+      showToast(isChecked ? `Sale settings saved. Sale is ON (${discount}% off).` : 'Sale settings saved. Sale is OFF.');
+      updatePreview();
+    } catch(err) {
+      console.error('Unable to save sale settings.', err);
+      showToast(err.message || 'Unable to save sale settings.');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = origText;
+    }
+  });
+}
+
 function renderAdminDashboard(client){
   const root=document.getElementById('admin-content');
   if(!root)return;
   const totalRevenue=adminOrders.filter(order=>order.status!=='cancelled').reduce((sum,order)=>sum+Number(order.total_amount),0);
-  root.innerHTML=`<div class="admin-heading"><div><span class="eyebrow ink-muted">WJ NOIR / PRIVATE</span><h1>Orders.</h1></div><div class="admin-heading-actions"><button type="button" id="admin-delete-all" class="admin-danger" ${adminOrders.length?'':'disabled'}>DELETE ALL ORDERS</button><button type="button" id="admin-logout" class="admin-logout">SIGN OUT</button></div></div><div class="admin-stats"><article><span>TOTAL ORDERS</span><strong>${adminOrders.length}</strong></article><article><span>REVENUE · EXCLUDING CANCELLED</span><strong>PKR ${totalRevenue.toLocaleString('en-PK')}</strong></article></div><div class="admin-tools"><label class="sr-only" for="admin-search">Search orders</label><input id="admin-search" placeholder="Search name, email, phone or order number"/><label class="sr-only" for="admin-status-filter">Filter by status</label><select id="admin-status-filter"><option value="">All statuses</option>${['pending','confirmed','shipped','delivered','cancelled'].map(status=>`<option value="${status}">${status}</option>`).join('')}</select></div><div id="admin-order-list" class="admin-order-list"></div>`;
+  root.innerHTML=`
+    <div class="admin-heading">
+      <div>
+        <span class="eyebrow ink-muted">WJ NOIR / PRIVATE</span>
+        <h1>Orders & Store Control.</h1>
+      </div>
+      <div class="admin-heading-actions">
+        <button type="button" id="admin-delete-all" class="admin-danger" ${adminOrders.length?'':'disabled'}>DELETE ALL ORDERS</button>
+        <button type="button" id="admin-logout" class="admin-logout">SIGN OUT</button>
+      </div>
+    </div>
+    ${renderAdminSaleSectionMarkup()}
+    <div class="admin-stats">
+      <article><span>TOTAL ORDERS</span><strong>${adminOrders.length}</strong></article>
+      <article><span>REVENUE · EXCLUDING CANCELLED</span><strong>PKR ${totalRevenue.toLocaleString('en-PK')}</strong></article>
+    </div>
+    <div class="admin-tools">
+      <label class="sr-only" for="admin-search">Search orders</label>
+      <input id="admin-search" placeholder="Search name, email, phone or order number"/>
+      <label class="sr-only" for="admin-status-filter">Filter by status</label>
+      <select id="admin-status-filter">
+        <option value="">All statuses</option>
+        ${['pending','confirmed','shipped','delivered','cancelled'].map(status=>`<option value="${status}">${status}</option>`).join('')}
+      </select>
+    </div>
+    <div id="admin-order-list" class="admin-order-list"></div>
+  `;
+  setupAdminSaleControls(client);
   document.getElementById('admin-logout').addEventListener('click',async()=>{
     const {error}=await client.auth.signOut();
     if(error){console.error('Admin sign-out failed.',error);showToast('Unable to sign out. Please try again.');return;}
@@ -768,7 +1195,7 @@ document.addEventListener('click',e=>{const closest=e.target.closest('[data-clos
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.querySelector('.product-image-zoom.is-open'))closeGalleryZoom();else closeAll();}});
 document.getElementById('newsletter-form').addEventListener('submit',e=>{e.preventDefault();document.getElementById('newsletter-message').textContent='Preview only: connect your newsletter provider before launch.';});
 document.getElementById('year').textContent=new Date().getFullYear();
-window.addEventListener('hashchange',route);window.addEventListener('popstate',route);setupGlobalCommerceActions();renderBag();route();
+window.addEventListener('hashchange',route);window.addEventListener('popstate',route);setupGlobalCommerceActions();renderBag();route();fetchSaleSettings();
 window.addEventListener('load',()=>{setTimeout(()=>document.getElementById('loading-screen').classList.add('done'),100);});setTimeout(()=>document.getElementById('loading-screen').classList.add('done'),2800);
 
 
