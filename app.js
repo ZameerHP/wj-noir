@@ -1,9 +1,30 @@
 const ASSET = '/assets/';
-const fragrances = [
+const defaultFragrances = [
   { id: 'the-office', title: 'The Office', upper: 'THE OFFICE', category: 'FOR HIM', tagline: 'Command the moment.', intro: 'Focus. Confidence. All day.', description: 'A confident blend of bright bergamot, aromatic lavender and a lasting woody finish.', story: 'Composed for those who know their presence speaks before they do.', image: 'wj-noir-the-office.jpg', altImage: 'the-office-poster.jpg', gallery: ['wj-noir-the-office.jpg','wj-noir-the-office-studio.jpg','wj-noir-the-office-water.jpg','wj-noir-the-office-box.jpg'], galleryAlt: ['WJ NOIR The Office fragrance on dark wet rocks','WJ NOIR The Office perfume bottle on a reflective white surface','WJ NOIR The Office perfume resting in dark reflective water','WJ NOIR The Office perfume in a black presentation box'], photoPosition: 'center', price: 2999, showPrice: true, tones: ['BERGAMOT', 'LAVENDER', 'WOODY'], notes: [{type:'TOP NOTE',note:'Bergamot',description:'Citrus & fresh'},{type:'HEART NOTE',note:'Lavender',description:'Floral & aromatic'},{type:'BASE NOTE',note:'Woody',description:'Warm & masculine'}], number:'01', texture:'#2b241e' },
   { id: 'ice-desire', title: 'Ice Desire', upper: 'ICE DESIRE', category: 'FOR HIM', tagline: 'A cooler kind of confidence.', intro: 'The allure of the unexpected.', description: 'A rush of crystalline freshness, cool mountain air and quiet confidence.', story: 'For the moment everything stands still, and only your presence remains.', image: 'wj-noir-ice-desire.jpg', altImage: 'dark-collection-alt.webp', gallery: ['wj-noir-ice-desire.jpg','wj-noir-ice-desire-water.jpg','wj-noir-ice-desire-studio.jpg','wj-noir-ice-desire-box.jpg'], galleryAlt: ['WJ NOIR Ice Desire perfume among ice and dark water','WJ NOIR Ice Desire perfume among ice on dark wet rocks','WJ NOIR Ice Desire perfume bottle on a reflective white surface','WJ NOIR Ice Desire perfume in a black presentation box'], video: 'wj-noir-ice-desire-film.mp4', photoPosition: 'center', price: 2499, showPrice: true, tones: ['FRESH', 'COOL', 'REFINED'], notes: [{type:'CHARACTER',note:'Icy freshness',description:'Cool & invigorating'},{type:'FEELING',note:'Crystal clarity',description:'Clean & luminous'},{type:'IMPRESSION',note:'Modern elegance',description:'Distinct & refined'}], number:'02', texture:'#becbd0' },
   { id: 'levoria', title: 'Lévoria', upper: 'LÉVORIA', category: 'FOR HER', tagline: 'A softer form of power.', intro: 'Elegance is unforgettable.', description: 'Golden vanilla, luminous fruits and warm woods in a graceful, lasting signature.', story: 'A fragrance that feels like the first golden light of evening.', image: 'wj-noir-levoria.jpg', altImage: 'dark-collection.webp', gallery: ['wj-noir-levoria-studio.jpg','wj-noir-levoria-box.jpg','wj-noir-levoria-model.jpg','wj-noir-levoria.jpg'], galleryAlt: ['WJ NOIR Lévoria for her perfume bottle on a clean white background','WJ NOIR Lévoria perfume presented in a black gift box','A woman holding the WJ NOIR Lévoria for her perfume','WJ NOIR Lévoria perfume bottle with warm gold accents'], video: 'wj-noir-levoria-film.mp4', photoPosition: 'center', price: 2499, showPrice: true, tones: ['VANILLA', 'FRUITY', 'WOODY'], notes: [{type:'TOP NOTE',note:'Vanilla',description:'Sweet & gourmand'},{type:'HEART NOTE',note:'Fruity',description:'Juicy & elegant'},{type:'BASE NOTE',note:'Woody',description:'Warm & lasting'}], number:'03', texture:'#8c5553' }
 ];
+
+function loadStoredCustomProducts(){
+  try {
+    const raw = localStorage.getItem('wj-noir-custom-products');
+    if(!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch(e) {
+    return [];
+  }
+}
+
+let fragrances = [...defaultFragrances, ...loadStoredCustomProducts()];
+
+function resolveAssetUrl(src){
+  if(!src) return '/assets/dark-collection.webp';
+  if(src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')){
+    return src;
+  }
+  return ASSET + src;
+}
 const app = document.getElementById('app');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let stickyPurchaseUpdate;
@@ -137,6 +158,44 @@ async function fetchSaleSettings(){
   }
 }
 
+async function fetchProductsFromDatabase(){
+  try {
+    const client = await getSupabase();
+    const { data, error } = await client.from('products').select('*').order('created_at', { ascending: true });
+    if(!error && Array.isArray(data) && data.length > 0){
+      const dbCustom = data
+        .filter(row => !defaultFragrances.some(df => df.id === row.id))
+        .map(row => ({
+          id: row.id,
+          title: row.title,
+          upper: row.upper || row.title.toUpperCase(),
+          category: row.category,
+          tagline: row.tagline || '',
+          intro: row.intro || '',
+          description: row.description || '',
+          story: row.story || row.tagline || '',
+          image: row.image,
+          altImage: row.alt_image || row.image,
+          gallery: Array.isArray(row.gallery) && row.gallery.length ? row.gallery : [row.image, row.image],
+          photoPosition: 'center',
+          price: Number(row.price),
+          showPrice: row.show_price ?? true,
+          tones: Array.isArray(row.tones) ? row.tones : [],
+          notes: Array.isArray(row.notes) ? row.notes : [],
+          number: row.number || '04',
+          texture: '#1a1a1a',
+          isCustom: true
+        }));
+      if(dbCustom.length > 0){
+        localStorage.setItem('wj-noir-custom-products', JSON.stringify(dbCustom));
+        fragrances = [...defaultFragrances, ...dbCustom];
+        renderBag();
+        route();
+      }
+    }
+  } catch(e) {}
+}
+
 const cartQuantity = () => cart.reduce((total,item)=>total+item.quantity,0);
 const cartSubtotal = items => items.reduce((total,item)=>{
   const p = fragrances.find(prod=>prod.id===item.id);
@@ -158,12 +217,13 @@ function card(p, extra='', reveal=true) {
     ? `<span class="sale-badge">-${Math.round(pricing.discountPercent)}%</span>`
     : '';
 
+  const totalCatalogCount = String(fragrances.length).padStart(2, '0');
   return `<article class="product-card ${extra} ${reveal?'reveal':''}">
     <a class="product-image-wrap" href="/fragrance/${p.id}" aria-label="Discover ${escapeHtml(p.title)}">
-      <img loading="lazy" decoding="async" src="${ASSET+p.image}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/>
+      <img loading="lazy" decoding="async" src="${resolveAssetUrl(p.image)}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/>
       ${badge}
       <span class="product-hover">DISCOVER FRAGRANCE ↗</span>
-      <span class="product-number">${p.number} / 03</span>
+      <span class="product-number">${p.number} / ${totalCatalogCount}</span>
     </a>
     <div class="product-card-info">
       <div>
@@ -186,7 +246,7 @@ function home() { return `
     <section class="quote-section"><div class="quote-outline">WJ NOIR</div><div class="quote-center reveal"><div class="eyebrow gold-muted">THE HOUSE PHILOSOPHY</div><div class="quote-mark">“</div><blockquote>Wear your presence.<br/><em>Leave your story.</em></blockquote><div class="quote-symbol">✦</div></div></section>
     <section class="closing-visual"><img loading="lazy" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR collection displayed beside a reflective alpine lake"/><div class="closing-overlay"></div><div class="closing-content reveal"><span class="eyebrow">WJ NOIR / THE COLLECTION</span><h2>YOUR NEXT<br/><em>SIGNATURE.</em></h2>${buttonLink('/shop','DISCOVER ALL FRAGRANCES')}</div></section>
   </main>`; }
-function shop() { return `<main class="interior-page"><section class="page-intro shop-intro"><span class="eyebrow ink-muted">WJ NOIR / THE COLLECTION</span><h1>Find your <em>signature.</em></h1><p>Three distinct expressions of the unforgettable. Discover your world.</p></section><div class="shop-filter-row"><span>THE COMPLETE COLLECTION / 03</span><span>EAU DE PARFUM · 50 ML</span></div><section class="shop-products section-pad"><div class="products-grid">${fragrances.map(p=>card(p)).join('')}</div></section><section class="shop-visual"><img src="${ASSET}dark-collection-alt.webp" alt="WJ NOIR fragrance collection on glossy black rocks" loading="lazy"/><div class="shop-visual-copy"><span class="eyebrow">A WORLD OF DISTINCTION</span><h2>THE NOIR <em>EDIT.</em></h2></div></section></main>`; }
+function shop() { return `<main class="interior-page"><section class="page-intro shop-intro"><span class="eyebrow ink-muted">WJ NOIR / THE COLLECTION</span><h1>Find your <em>signature.</em></h1><p>Three distinct expressions of the unforgettable. Discover your world.</p></section><div class="shop-filter-row"><span>THE COMPLETE COLLECTION / ${String(fragrances.length).padStart(2, '0')}</span><span>EAU DE PARFUM · 50 ML</span></div><section class="shop-products section-pad"><div class="products-grid">${fragrances.map(p=>card(p)).join('')}</div></section><section class="shop-visual"><img src="${ASSET}dark-collection-alt.webp" alt="WJ NOIR fragrance collection on glossy black rocks" loading="lazy"/><div class="shop-visual-copy"><span class="eyebrow">A WORLD OF DISTINCTION</span><h2>THE NOIR <em>EDIT.</em></h2></div></section></main>`; }
 function about() { return `<main class="interior-page"><section class="about-hero"><img src="${ASSET}dark-collection-alt.webp" alt="Dramatic WJ NOIR perfume campaign on black rocks in an alpine landscape"/><div class="about-hero-shade"></div><div class="about-hero-content reveal"><span class="eyebrow">THE STORY / WJ NOIR</span><h1>NOT MADE<br/>TO <em>BLEND IN.</em></h1><p>A fragrance house inspired by presence, character and the beautiful art of being remembered.</p></div></section><section class="about-copy section-pad"><div class="eyebrow ink-muted">OUR PHILOSOPHY / 001</div><h2>A scent can say<br/>what words <em>cannot.</em></h2><div class="about-copy-bottom"><p>We believe a fragrance is a deeply personal signature. It can be bold or quiet, warm or refreshing, but it should always feel unmistakably yours.</p><p>From the focused confidence of The Office to the icy allure of Ice Desire and the intimate warmth of Lévoria, our collection celebrates three very different ways to leave an impression.</p></div></section><section class="about-strip"><img loading="lazy" src="${ASSET}dark-collection-alt.webp" alt="Three WJ NOIR perfumes arranged in the mountains"/></section><section class="about-cta section-pad"><span class="eyebrow ink-muted">THE INVITATION</span><h2>DISCOVER YOUR<br/><em>OWN SIGNATURE.</em></h2><a class="button dark-btn" href="/shop">EXPLORE THE COLLECTION <span>↗</span></a></section></main>`; }
 function product(p) {
   const related = fragrances.filter(other=>other.id!==p.id);
@@ -195,10 +255,10 @@ function product(p) {
   const filmPoster = p.id === 'levoria' ? 'wj-noir-levoria-studio.jpg' : p.id === 'ice-desire' ? 'wj-noir-ice-desire-studio.jpg' : 'the-office-poster.jpg';
   const galleryMarkup = `<div class="product-gallery product-gallery--interactive" aria-label="${escapeHtml(p.title)} fragrance gallery">
         <div class="product-gallery-track" id="product-gallery-track" aria-label="Swipe through product images">
-          ${gallery.map((image,index)=>`<figure class="product-gallery-slide" data-gallery-slide="${index}"><button type="button" class="product-gallery-zoom-trigger" data-gallery-zoom="${index}" aria-label="Zoom ${escapeHtml(p.title)} image ${index+1}"><img src="${ASSET+image}" data-fallback="${ASSET}dark-collection.webp" alt="${escapeHtml(p.galleryAlt?.[index]||`WJ NOIR ${p.title} fragrance photograph ${index+1}`)}" width="768" height="1024" loading="eager" fetchpriority="${index===0?'high':'low'}" decoding="async"/></button></figure>`).join('')}
+          ${gallery.map((image,index)=>`<figure class="product-gallery-slide" data-gallery-slide="${index}"><button type="button" class="product-gallery-zoom-trigger" data-gallery-zoom="${index}" aria-label="Zoom ${escapeHtml(p.title)} image ${index+1}"><img src="${resolveAssetUrl(image)}" data-fallback="${ASSET}dark-collection.webp" alt="${escapeHtml(p.galleryAlt?.[index]||`WJ NOIR ${p.title} fragrance photograph ${index+1}`)}" width="768" height="1024" loading="eager" fetchpriority="${index===0?'high':'low'}" decoding="async"/></button></figure>`).join('')}
         </div>
         <div class="product-gallery-thumbnails" role="group" aria-label="Choose a product image">
-          ${gallery.map((image,index)=>`<button type="button" class="product-gallery-thumbnail${index===0?' is-active':''}" data-gallery-index="${index}" aria-label="Show image ${index+1}" aria-pressed="${index===0}"><img src="${ASSET+image}" alt="" width="72" height="88" loading="${index===0?'eager':'lazy'}" fetchpriority="low" decoding="async"/></button>`).join('')}
+          ${gallery.map((image,index)=>`<button type="button" class="product-gallery-thumbnail${index===0?' is-active':''}" data-gallery-index="${index}" aria-label="Show image ${index+1}" aria-pressed="${index===0}"><img src="${resolveAssetUrl(image)}" alt="" width="72" height="88" loading="${index===0?'eager':'lazy'}" fetchpriority="low" decoding="async"/></button>`).join('')}
         </div>
         <div class="product-image-zoom" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Zoomed ${escapeHtml(p.title)} product image">
           <button type="button" class="product-image-zoom-backdrop" data-gallery-zoom-close aria-label="Close zoomed image"></button>
@@ -758,7 +818,7 @@ function cartItemMarkup(item){
   const priceDisplay = pricing.isSale
     ? `<strong><span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <span class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</span></strong>`
     : `<strong>PKR ${pricing.originalPrice.toLocaleString('en-PK')}</strong>`;
-  return `<div class="bag-item"><img src="${ASSET+p.image}" alt="${escapeHtml(p.title)}"/><div><span class="eyebrow ink-muted">EAU DE PARFUM / 50 ML</span><h3>${escapeHtml(p.title)}</h3>${priceDisplay}<div class="bag-quantity"><button type="button" data-cart-adjust="-1" data-cart-id="${p.id}" aria-label="Remove one ${escapeHtml(p.title)}">−</button><span>QTY ${item.quantity}</span><button type="button" data-cart-adjust="1" data-cart-id="${p.id}" aria-label="Add one ${escapeHtml(p.title)}">+</button></div><button type="button" data-cart-remove="${p.id}" class="remove-link">REMOVE ×</button></div></div>`;
+  return `<div class="bag-item"><img src="${resolveAssetUrl(p.image)}" alt="${escapeHtml(p.title)}"/><div><span class="eyebrow ink-muted">EAU DE PARFUM / 50 ML</span><h3>${escapeHtml(p.title)}</h3>${priceDisplay}<div class="bag-quantity"><button type="button" data-cart-adjust="-1" data-cart-id="${p.id}" aria-label="Remove one ${escapeHtml(p.title)}">−</button><span>QTY ${item.quantity}</span><button type="button" data-cart-adjust="1" data-cart-id="${p.id}" aria-label="Add one ${escapeHtml(p.title)}">+</button></div><button type="button" data-cart-remove="${p.id}" class="remove-link">REMOVE ×</button></div></div>`;
 }
 function renderBag(){
   const count=cartQuantity();
@@ -783,7 +843,7 @@ function checkoutPage(){
     const priceDisplay = pricing.isSale
       ? `<b><span class="price-original">PKR ${(pricing.originalPrice*item.quantity).toLocaleString('en-PK')}</span> <span class="price-sale">PKR ${lineTotal.toLocaleString('en-PK')}</span></b>`
       : `<b>PKR ${lineTotal.toLocaleString('en-PK')}</b>`;
-    return `<div class="checkout-item"><img src="${ASSET+p.image}" alt=""/><div><strong>${escapeHtml(p.title)}</strong><span>50 ml · Eau de Parfum · Qty ${item.quantity}</span></div>${priceDisplay}</div>`;
+    return `<div class="checkout-item"><img src="${resolveAssetUrl(p.image)}" alt=""/><div><strong>${escapeHtml(p.title)}</strong><span>50 ml · Eau de Parfum · Qty ${item.quantity}</span></div>${priceDisplay}</div>`;
   }).join('');
   return `<main class="commerce-page checkout-page"><a class="commerce-back-link" href="/shop">← CONTINUE EXPLORING</a><div class="commerce-heading"><span class="eyebrow ink-muted">WJ NOIR / CHECKOUT</span><h1>Complete your <em>order.</em></h1><p>We will contact you to confirm delivery details.</p></div><div class="checkout-layout"><form id="checkout-form" class="checkout-form" novalidate><h2>Delivery details</h2><div class="checkout-field"><label for="customer-name">Full name</label><input id="customer-name" name="customer_name" autocomplete="name" maxlength="120" required/></div><div class="checkout-field"><label for="customer-email">Email</label><input id="customer-email" name="email" type="email" autocomplete="email" maxlength="254" required/></div><div class="checkout-field"><label for="customer-phone">Phone number</label><input id="customer-phone" name="phone" type="tel" autocomplete="tel" maxlength="30" required/><small>Include at least 10 digits.</small></div><div class="checkout-field"><label for="customer-address">Street address</label><input id="customer-address" name="address" autocomplete="street-address" maxlength="300" required/></div><div class="checkout-field-grid"><div class="checkout-field"><label for="customer-city">City</label><input id="customer-city" name="city" autocomplete="address-level2" maxlength="100" required/></div><div class="checkout-field"><label for="customer-state">State / province</label><input id="customer-state" name="state" autocomplete="address-level1" maxlength="100" required/></div><div class="checkout-field"><label for="customer-postal-code">Postal code</label><input id="customer-postal-code" name="postal_code" autocomplete="postal-code" maxlength="20" required/></div><div class="checkout-field"><label for="customer-country">Country</label><input id="customer-country" name="country" autocomplete="country-name" maxlength="100" required/></div></div><div class="checkout-field"><label for="order-notes">Order notes <span>(optional)</span></label><textarea id="order-notes" name="notes" rows="3" maxlength="1000"></textarea></div><fieldset class="payment-choice"><legend>Payment method</legend><label><input type="radio" name="payment_method" value="Cash on Delivery" checked/><span><strong>Cash on Delivery</strong><small>Pay when your order arrives.</small></span></label></fieldset><p id="checkout-error" class="form-message" role="alert" hidden></p><button id="place-order" type="submit" class="button dark-btn checkout-submit">PLACE ORDER · PKR ${cartSubtotal(items).toLocaleString('en-PK')}</button></form><aside class="checkout-summary"><h2>Order summary</h2>${rows}<div class="checkout-total"><span>Total</span><strong>PKR ${cartSubtotal(items).toLocaleString('en-PK')}</strong></div><p>50 ml · Eau de Parfum</p></aside></div></main>`;
 }
@@ -1289,39 +1349,358 @@ function setupAdminSaleControls(client){
   });
 }
 
+function renderAdminProductsMarkup(){
+  return `
+    <div class="admin-products-section">
+      <div class="admin-product-create-card">
+        <div class="admin-product-create-header">
+          <div>
+            <span class="eyebrow ink-muted">WJ NOIR / CATALOG CREATOR</span>
+            <h2>Add New Fragrance</h2>
+          </div>
+        </div>
+        <form id="admin-new-product-form" class="admin-product-form">
+          <div class="admin-product-form-grid">
+            <div class="admin-product-field">
+              <label for="new-product-title">Fragrance Title *</label>
+              <input id="new-product-title" required placeholder="e.g. Royal Oud or Velvet Noir"/>
+            </div>
+            <div class="admin-product-field">
+              <label for="new-product-category">Category *</label>
+              <select id="new-product-category" required>
+                <option value="FOR HIM">FOR HIM</option>
+                <option value="FOR HER">FOR HER</option>
+                <option value="UNISEX">UNISEX</option>
+              </select>
+            </div>
+            <div class="admin-product-field">
+              <label for="new-product-price">Regular Price (PKR) *</label>
+              <input type="number" id="new-product-price" step="1" min="1" required placeholder="e.g. 2999"/>
+            </div>
+            <div class="admin-product-field">
+              <label for="new-product-tagline">Tagline / Short Hook</label>
+              <input id="new-product-tagline" placeholder="e.g. Command your presence."/>
+            </div>
+            <div class="admin-product-field">
+              <label for="new-product-intro">Intro Summary</label>
+              <input id="new-product-intro" placeholder="e.g. Warm. Enigmatic. Unforgettable."/>
+            </div>
+            <div class="admin-product-field">
+              <label for="new-product-tones">Key Tones (Comma-separated)</label>
+              <input id="new-product-tones" placeholder="e.g. AMBER, OUD, SPICED"/>
+            </div>
+            <div class="admin-product-field admin-product-field--full">
+              <label for="new-product-description">Full Editorial Description</label>
+              <textarea id="new-product-description" rows="3" placeholder="Describe the character, atmosphere and lasting impression of this perfume..."></textarea>
+            </div>
+            <div class="admin-product-field admin-product-field--full">
+              <label>Fragrance Notes (Top / Heart / Base)</label>
+              <div class="admin-product-notes-grid">
+                <input id="new-product-note-top" placeholder="Top Note (e.g. Bergamot & Saffron)"/>
+                <input id="new-product-note-heart" placeholder="Heart Note (e.g. Amber & Rose)"/>
+                <input id="new-product-note-base" placeholder="Base Note (e.g. Rare Oud & Cedarwood)"/>
+              </div>
+            </div>
+            <div class="admin-product-field admin-product-field--full">
+              <label>Product Photography</label>
+              <div class="admin-product-photo-picker">
+                <img id="new-product-thumb-preview" class="admin-product-thumb-preview" src="/assets/dark-collection.webp" alt="Product Image Preview"/>
+                <div>
+                  <strong>Select Perfume Photo</strong>
+                  <p style="font-size:12px;color:#78766e;margin:4px 0 10px">Upload bottle or studio photograph. It is automatically optimized for fast loading.</p>
+                  <input type="file" id="new-product-file" accept="image/png, image/jpeg, image/webp" style="display:none"/>
+                  <button type="button" id="new-product-file-btn" class="button outline-btn" style="padding:8px 16px;font-size:10px;cursor:pointer">📷 SELECT PHOTO FILE</button>
+                  <span id="new-product-filename" style="font-size:11px;color:#8c897f;display:none;margin-left:8px"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end">
+            <button type="submit" id="admin-product-submit" class="admin-product-submit-btn">+ LAUNCH &amp; PUBLISH FRAGRANCE</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="admin-existing-products">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+          <div>
+            <span class="eyebrow ink-muted">WJ NOIR / CATALOGUE</span>
+            <h3 style="margin:4px 0 0">All Active Perfumes (${fragrances.length})</h3>
+          </div>
+        </div>
+        <div class="admin-catalog-grid">
+          ${fragrances.map(p => {
+            const isCustom = !['the-office', 'ice-desire', 'levoria'].includes(p.id);
+            const pricing = getProductPricing(p);
+            return `
+              <div class="admin-catalog-card">
+                <span class="admin-catalog-badge ${isCustom ? 'is-custom' : ''}">${isCustom ? 'CUSTOM ADDED' : 'CORE SIGNATURE'}</span>
+                <img class="admin-catalog-thumb" src="${resolveAssetUrl(p.image)}" alt="${escapeHtml(p.title)}"/>
+                <div class="admin-catalog-info">
+                  <span>${p.number} · ${escapeHtml(p.category)}</span>
+                  <strong>${escapeHtml(p.title)}</strong>
+                  <div class="catalog-price">
+                    ${pricing.isSale
+                      ? `<span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <strong class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</strong>`
+                      : `PKR ${p.price.toLocaleString('en-PK')}`
+                    }
+                  </div>
+                  <a href="/fragrance/${p.id}" target="_blank" style="font-size:11px;color:#a8803a;text-decoration:underline">View in store ↗</a>
+                  ${isCustom ? `<button type="button" class="admin-delete-prod-btn" data-delete-custom-product="${p.id}">REMOVE PRODUCT</button>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function setupAdminProductsControls(client){
+  const form = document.getElementById('admin-new-product-form');
+  if(!form) return;
+
+  const fileInput = document.getElementById('new-product-file');
+  const fileBtn = document.getElementById('new-product-file-btn');
+  const thumbPreview = document.getElementById('new-product-thumb-preview');
+  const filenameEl = document.getElementById('new-product-filename');
+  const submitBtn = document.getElementById('admin-product-submit');
+
+  let stagedImage = '/assets/dark-collection.webp';
+
+  fileBtn?.addEventListener('click', () => fileInput?.click());
+
+  fileInput?.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if(!file) return;
+    fileBtn.disabled = true;
+    fileBtn.textContent = 'OPTIMIZING...';
+    try {
+      const dataUrl = await compressImageFile(file, 900, 1200, 0.85);
+      stagedImage = dataUrl;
+      if(thumbPreview) thumbPreview.src = dataUrl;
+      if(filenameEl){
+        filenameEl.textContent = `Photo: ${file.name}`;
+        filenameEl.style.display = 'inline';
+      }
+      showToast('Product photo optimized and ready.');
+    } catch(err) {
+      console.error('Failed to compress product image.', err);
+      showToast('Could not optimize this photo. Please try another image.');
+    } finally {
+      fileBtn.disabled = false;
+      fileBtn.textContent = '📷 SELECT PHOTO FILE';
+    }
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    const origText = submitBtn.textContent;
+    submitBtn.textContent = 'PUBLISHING...';
+
+    try {
+      const title = document.getElementById('new-product-title').value.trim();
+      if(!title) throw new Error('Please enter a fragrance title.');
+      const category = document.getElementById('new-product-category').value;
+      const price = Number(document.getElementById('new-product-price').value);
+      if(!price || price <= 0) throw new Error('Please enter a valid price in PKR.');
+      const tagline = document.getElementById('new-product-tagline').value.trim();
+      const intro = document.getElementById('new-product-intro').value.trim();
+      const description = document.getElementById('new-product-description').value.trim();
+      const topNote = document.getElementById('new-product-note-top').value.trim();
+      const heartNote = document.getElementById('new-product-note-heart').value.trim();
+      const baseNote = document.getElementById('new-product-note-base').value.trim();
+      const rawTones = document.getElementById('new-product-tones').value.trim();
+
+      let baseId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'perfume';
+      let id = baseId;
+      let counter = 1;
+      while(fragrances.some(f => f.id === id)){
+        counter++;
+        id = `${baseId}-${counter}`;
+      }
+
+      const notes = [];
+      if(topNote) notes.push({ type: 'TOP NOTE', note: topNote, description: 'Luminous entrance' });
+      if(heartNote) notes.push({ type: 'HEART NOTE', note: heartNote, description: 'The soul of the scent' });
+      if(baseNote) notes.push({ type: 'BASE NOTE', note: baseNote, description: 'Lasting signature' });
+      if(!notes.length){
+        notes.push({ type: 'CHARACTER', note: title, description: 'Distinct & memorable' });
+      }
+
+      const tones = rawTones ? rawTones.split(',').map(t => t.trim().toUpperCase()).filter(Boolean) : ['SIGNATURE', 'DISTINCT'];
+      const nextNum = String(fragrances.length + 1).padStart(2, '0');
+
+      const newProduct = {
+        id,
+        title,
+        upper: title.toUpperCase(),
+        category,
+        tagline: tagline || 'Wear your presence.',
+        intro: intro || 'An entrance you feel.',
+        description: description || `${title} Eau de Parfum is an unmistakable signature composed for presence, character and distinction.`,
+        story: tagline || intro || 'Composed for those who choose their own way.',
+        image: stagedImage,
+        altImage: stagedImage,
+        gallery: [stagedImage, stagedImage],
+        photoPosition: 'center',
+        price,
+        showPrice: true,
+        tones,
+        notes,
+        number: nextNum,
+        texture: '#1a1a1a',
+        isCustom: true
+      };
+
+      const customProducts = loadStoredCustomProducts();
+      customProducts.push(newProduct);
+      localStorage.setItem('wj-noir-custom-products', JSON.stringify(customProducts));
+
+      try {
+        await client.from('products').upsert({
+          id: newProduct.id,
+          title: newProduct.title,
+          upper: newProduct.upper,
+          category: newProduct.category,
+          tagline: newProduct.tagline,
+          intro: newProduct.intro,
+          description: newProduct.description,
+          story: newProduct.story,
+          image: newProduct.image,
+          alt_image: newProduct.altImage,
+          gallery: newProduct.gallery,
+          price: newProduct.price,
+          show_price: true,
+          tones: newProduct.tones,
+          notes: newProduct.notes,
+          number: newProduct.number
+        });
+      } catch(dbErr) {
+        console.warn('Database table "products" sync deferred:', dbErr);
+      }
+
+      fragrances = [...defaultFragrances, ...customProducts];
+
+      showToast(`✨ "${title}" has been launched and added to the store catalog!`);
+      sessionStorage.setItem('wj-noir-admin-tab', 'products');
+      renderAdminDashboard(client);
+    } catch(err) {
+      console.error('Failed to create product.', err);
+      showToast(err.message || 'Could not add product.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = origText;
+    }
+  });
+
+  document.querySelectorAll('[data-delete-custom-product]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pid = btn.dataset.deleteCustomProduct;
+      const prod = fragrances.find(p => p.id === pid);
+      const title = prod ? prod.title : 'this product';
+      if(!window.confirm(`Are you sure you want to remove "${title}" from the store catalog?`)) return;
+
+      btn.disabled = true;
+      btn.textContent = 'REMOVING...';
+
+      let customProducts = loadStoredCustomProducts().filter(p => p.id !== pid);
+      localStorage.setItem('wj-noir-custom-products', JSON.stringify(customProducts));
+
+      try {
+        await client.from('products').delete().eq('id', pid);
+      } catch(e){}
+
+      fragrances = [...defaultFragrances, ...customProducts];
+      showToast(`"${title}" has been removed.`);
+      sessionStorage.setItem('wj-noir-admin-tab', 'products');
+      renderAdminDashboard(client);
+    });
+  });
+}
+
 function renderAdminDashboard(client){
   const root=document.getElementById('admin-content');
   if(!root)return;
   const totalRevenue=adminOrders.filter(order=>order.status!=='cancelled').reduce((sum,order)=>sum+Number(order.total_amount),0);
+  const activeTab = sessionStorage.getItem('wj-noir-admin-tab') || 'orders';
+
   root.innerHTML=`
     <div class="admin-heading">
       <div>
         <span class="eyebrow ink-muted">WJ NOIR / PRIVATE</span>
-        <h1>Orders & Store Control.</h1>
+        <h1>Orders &amp; Store Control.</h1>
       </div>
       <div class="admin-heading-actions">
-        <button type="button" id="admin-delete-all" class="admin-danger" ${adminOrders.length?'':'disabled'}>DELETE ALL ORDERS</button>
         <button type="button" id="admin-logout" class="admin-logout">SIGN OUT</button>
       </div>
     </div>
-    ${renderAdminSaleSectionMarkup()}
-    <div class="admin-stats">
-      <article><span>TOTAL ORDERS</span><strong>${adminOrders.length}</strong></article>
-      <article><span>REVENUE · EXCLUDING CANCELLED</span><strong>PKR ${totalRevenue.toLocaleString('en-PK')}</strong></article>
+
+    <nav class="admin-navbar" aria-label="Admin Navigation Tabs">
+      <button type="button" class="admin-nav-item ${activeTab === 'orders' ? 'is-active' : ''}" data-admin-tab="orders">
+        <span>📦 ORDERS</span>
+        <span class="admin-nav-badge" id="tab-orders-count">${adminOrders.length}</span>
+      </button>
+      <button type="button" class="admin-nav-item ${activeTab === 'sales' ? 'is-active' : ''}" data-admin-tab="sales">
+        <span>🏷️ SALES</span>
+        <span class="admin-nav-badge-sale ${activeSale?.is_active ? 'is-on' : 'is-off'}">${activeSale?.is_active ? 'ON' : 'OFF'}</span>
+      </button>
+      <button type="button" class="admin-nav-item ${activeTab === 'products' ? 'is-active' : ''}" data-admin-tab="products">
+        <span>✨ NEW PRODUCT</span>
+        <span class="admin-nav-badge">${fragrances.length}</span>
+      </button>
+    </nav>
+
+    <!-- Tab 1: Orders -->
+    <div id="admin-tab-orders" class="admin-tab-pane ${activeTab === 'orders' ? 'is-active' : ''}">
+      <div class="admin-stats">
+        <article><span>TOTAL ORDERS</span><strong>${adminOrders.length}</strong></article>
+        <article><span>REVENUE · EXCLUDING CANCELLED</span><strong>PKR ${totalRevenue.toLocaleString('en-PK')}</strong></article>
+      </div>
+      <div class="admin-tools">
+        <label class="sr-only" for="admin-search">Search orders</label>
+        <input id="admin-search" placeholder="Search name, email, phone or order number"/>
+        <label class="sr-only" for="admin-status-filter">Filter by status</label>
+        <select id="admin-status-filter">
+          <option value="">All statuses</option>
+          ${['pending','confirmed','shipped','delivered','cancelled'].map(status=>`<option value="${status}">${status}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+        <button type="button" id="admin-delete-all" class="admin-danger" ${adminOrders.length?'':'disabled'}>DELETE ALL ORDERS</button>
+      </div>
+      <div id="admin-order-list" class="admin-order-list"></div>
     </div>
-    <div class="admin-tools">
-      <label class="sr-only" for="admin-search">Search orders</label>
-      <input id="admin-search" placeholder="Search name, email, phone or order number"/>
-      <label class="sr-only" for="admin-status-filter">Filter by status</label>
-      <select id="admin-status-filter">
-        <option value="">All statuses</option>
-        ${['pending','confirmed','shipped','delivered','cancelled'].map(status=>`<option value="${status}">${status}</option>`).join('')}
-      </select>
+
+    <!-- Tab 2: Sales -->
+    <div id="admin-tab-sales" class="admin-tab-pane ${activeTab === 'sales' ? 'is-active' : ''}">
+      ${renderAdminSaleSectionMarkup()}
     </div>
-    <div id="admin-order-list" class="admin-order-list"></div>
+
+    <!-- Tab 3: Products & Add New -->
+    <div id="admin-tab-products" class="admin-tab-pane ${activeTab === 'products' ? 'is-active' : ''}">
+      ${renderAdminProductsMarkup()}
+    </div>
   `;
+
+  // Setup tab switcher
+  const tabButtons = root.querySelectorAll('[data-admin-tab]');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.adminTab;
+      sessionStorage.setItem('wj-noir-admin-tab', target);
+      tabButtons.forEach(b => b.classList.toggle('is-active', b.dataset.adminTab === target));
+      root.querySelectorAll('.admin-tab-pane').forEach(p => {
+        p.classList.toggle('is-active', p.id === `admin-tab-${target}`);
+      });
+    });
+  });
+
   setupAdminSaleControls(client);
-  document.getElementById('admin-logout').addEventListener('click',async()=>{
+  setupAdminProductsControls(client);
+
+  document.getElementById('admin-logout')?.addEventListener('click',async()=>{
     const {error}=await client.auth.signOut();
     if(error){console.error('Admin sign-out failed.',error);showToast('Unable to sign out. Please try again.');return;}
     adminOrders=[];route();
@@ -1502,7 +1881,7 @@ function setupGlobalCommerceActions(){
     }
   });
 }
-function renderSearch(){const q=document.getElementById('search-input').value.trim().toLowerCase();const results=fragrances.filter(p=>!q||[p.title,p.category,p.tagline,...p.tones,...p.notes.map(n=>n.note)].join(' ').toLowerCase().includes(q));document.getElementById('search-results').innerHTML=results.length?results.map(p=>`<a class="search-result" href="/fragrance/${p.id}" data-close="search"><img src="${ASSET+p.image}" alt=""/><span><small>${p.category} · EAU DE PARFUM</small><strong>${p.title}</strong><small>${p.tones.join(' / ')}</small></span><i>↗</i></a>`).join(''):`<div class="search-empty">No fragrance matched your search. Try “woody”, “ice” or “vanilla”.</div>`;}
+function renderSearch(){const q=document.getElementById('search-input').value.trim().toLowerCase();const results=fragrances.filter(p=>!q||[p.title,p.category,p.tagline,...p.tones,...p.notes.map(n=>n.note)].join(' ').toLowerCase().includes(q));document.getElementById('search-results').innerHTML=results.length?results.map(p=>`<a class="search-result" href="/fragrance/${p.id}" data-close="search"><img src="${resolveAssetUrl(p.image)}" alt=""/><span><small>${p.category} · EAU DE PARFUM</small><strong>${p.title}</strong><small>${p.tones.join(' / ')}</small></span><i>↗</i></a>`).join(''):`<div class="search-empty">No fragrance matched your search. Try “woody”, “ice” or “vanilla”.</div>`;}
 document.getElementById('menu-toggle').addEventListener('click',()=>toggleOverlay('menu'));
 document.getElementById('search-toggle').addEventListener('click',()=>toggleOverlay('search'));
 document.getElementById('bag-toggle').addEventListener('click',()=>toggleOverlay('bag'));
@@ -1511,7 +1890,7 @@ document.addEventListener('click',e=>{const closest=e.target.closest('[data-clos
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.querySelector('.product-image-zoom.is-open'))closeGalleryZoom();else closeAll();}});
 document.getElementById('newsletter-form').addEventListener('submit',e=>{e.preventDefault();document.getElementById('newsletter-message').textContent='Preview only: connect your newsletter provider before launch.';});
 document.getElementById('year').textContent=new Date().getFullYear();
-window.addEventListener('hashchange',route);window.addEventListener('popstate',route);setupGlobalCommerceActions();renderBag();route();fetchSaleSettings();
+window.addEventListener('hashchange',route);window.addEventListener('popstate',route);setupGlobalCommerceActions();renderBag();route();fetchSaleSettings();fetchProductsFromDatabase();
 window.addEventListener('load',()=>{setTimeout(()=>document.getElementById('loading-screen').classList.add('done'),100);});setTimeout(()=>document.getElementById('loading-screen').classList.add('done'),2800);
 
 
