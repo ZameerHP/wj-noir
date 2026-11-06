@@ -119,11 +119,11 @@ begin
 
   insert into public.orders (
     customer_name, email, phone, address, city, state, postal_code, country,
-    notes, payment_method, total_amount
+    notes, payment_method, total_amount, status
   ) values (
     trim(p_customer_name), lower(trim(p_email)), trim(p_phone), trim(p_address),
     trim(p_city), trim(p_state), trim(p_postal_code), trim(p_country),
-    trim(coalesce(p_notes, '')), 'Cash on Delivery', v_total
+    trim(coalesce(p_notes, '')), 'Cash on Delivery', v_total, 'pending'
   )
   returning * into v_order;
 
@@ -165,3 +165,6 @@ begin
   );
 end;
 $$;
+
+revoke all on function public.create_order(text, text, text, text, text, text, text, text, text, text, jsonb) from public;
+grant execute on function public.create_order(text, text, text, text, text, text, text, text, text, text, jsonb) to anon, authenticated;
