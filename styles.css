@@ -1309,10 +1309,10 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
   position:relative;
   z-index:2;
   width:min(440px,100%);
-  max-height:min(90vh,780px);
+  max-height:min(92vh,820px);
   background:#131412;
   color:#f4f2ec;
-  border:1px solid rgba(228,199,138,.3);
+  border:1px solid rgba(228,199,138,.35);
   box-shadow:0 24px 60px rgba(0,0,0,.65);
   border-radius:6px;
   overflow:hidden;
@@ -1332,7 +1332,7 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
   width:36px;
   height:36px;
   border-radius:50%;
-  background:rgba(19,20,18,.75);
+  background:rgba(19,20,18,.8);
   border:1px solid rgba(255,255,255,.2);
   color:#fff;
   font-size:22px;
@@ -1348,52 +1348,32 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
   color:#e4c78a;
   transform:rotate(90deg);
 }
-.sale-popup-banner{
+.sale-popup-image-wrap{
   position:relative;
   width:100%;
-  max-height:340px;
+  max-height:min(72vh,560px);
   overflow:hidden;
   background:#090909;
+  display:block;
+  text-decoration:none;
 }
-.sale-popup-banner img{
+.sale-popup-image-wrap img{
   width:100%;
   height:100%;
-  object-fit:cover;
+  max-height:min(72vh,560px);
+  object-fit:contain;
   object-position:center top;
   display:block;
+  margin:0 auto;
 }
-.sale-popup-body{
-  padding:24px 28px 28px;
-  text-align:center;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:10px;
-}
-.sale-popup-body .eyebrow{
-  color:#d4b373;
-  font-size:9px;
-  letter-spacing:.24em;
-}
-.sale-popup-body h2{
-  font-family:var(--serif);
-  font-size:clamp(26px,5vw,36px);
-  font-weight:400;
-  letter-spacing:-.04em;
-  margin:2px 0 4px;
-  color:#fff;
-  line-height:1.15;
-}
-.sale-popup-body p{
-  margin:0 0 16px;
-  font-size:12px;
-  line-height:1.75;
-  color:#aaa79e;
-  max-width:340px;
+.sale-popup-footer{
+  padding:14px 22px 18px;
+  background:#131412;
+  border-top:1px solid rgba(255,255,255,.07);
 }
 .sale-popup-btn{
   width:100%;
-  min-height:50px;
+  min-height:48px;
   justify-content:center;
   font-size:10px;
   letter-spacing:.18em;
@@ -1408,10 +1388,8 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
   transform:translateY(-2px);
 }
 @media(max-height:720px){
-  .sale-popup-banner{max-height:240px}
-  .sale-popup-body{padding:18px 22px 22px}
-  .sale-popup-body h2{font-size:24px}
-  .sale-popup-body p{margin-bottom:12px;font-size:11px}
+  .sale-popup-image-wrap{max-height:min(65vh,420px)}
+  .sale-popup-footer{padding:10px 16px 14px}
 }
 
 /* 4. Admin Panel — Sale Settings Section */
@@ -1550,6 +1528,85 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
   gap:7px;
   font-size:12px;
   cursor:pointer;
+}
+.admin-sale-field--full{
+  grid-column:1 / -1;
+}
+.admin-banner-preview-box{
+  display:flex;
+  gap:18px;
+  align-items:flex-start;
+  margin-top:6px;
+  padding:16px;
+  background:#faf9f6;
+  border:1px solid #e2ded5;
+  border-radius:4px;
+}
+.admin-banner-thumb{
+  width:96px;
+  height:136px;
+  object-fit:cover;
+  border-radius:3px;
+  border:1px solid #d4cfc4;
+  background:#111;
+  flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+.admin-banner-controls{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  flex:1;
+}
+.admin-banner-controls strong{
+  font-size:13px;
+  color:#1b1c19;
+}
+.admin-banner-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  margin-top:4px;
+}
+.admin-banner-btn{
+  min-width:0;
+  padding:9px 15px;
+  min-height:38px;
+  font-size:10px;
+  letter-spacing:.12em;
+  font-weight:700;
+  cursor:pointer;
+  background:#181917;
+  color:#fff;
+  border:1px solid #181917;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.admin-banner-btn:hover{
+  background:#3b3c37;
+  border-color:#3b3c37;
+}
+.admin-banner-btn-secondary{
+  background:transparent;
+  border:1px solid #8c897f;
+  color:#3a3934;
+}
+.admin-banner-btn-secondary:hover{
+  background:#181917;
+  color:#fff;
+  border-color:#181917;
+}
+@media(max-width:560px){
+  .admin-banner-preview-box{
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+  }
+  .admin-banner-actions{
+    justify-content:center;
+  }
 }
 .sale-preview-wrap{
   margin-top:10px;

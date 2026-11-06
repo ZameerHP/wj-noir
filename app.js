@@ -31,6 +31,7 @@ let adminTriggerClicks=0;
 let adminTriggerTimeout;
 let activeSale=null;
 let saleCountdownInterval=null;
+let salePopupTimer=null;
 
 try {
   activeSale = JSON.parse(localStorage.getItem('wj-noir-sale-settings-cache') || 'null');
@@ -236,44 +237,85 @@ function setupCountdownTimer(){
   saleCountdownInterval=setInterval(update,1000);
 }
 
-function checkAndShowSalePopup(){
-  if(routePath()!=='/') return;
-  if(!activeSale||!activeSale.is_active) return;
-  const now=new Date();
-  if(activeSale.start_date&&new Date(activeSale.start_date)>now) return;
-  if(activeSale.end_date&&new Date(activeSale.end_date)<now) return;
-  if(sessionStorage.getItem('wj-noir-sale-popup-dismissed')==='true') return;
+function compressImageFile(file, maxWidth = 1200, maxHeight = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = e => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth || h > maxHeight) {
+          const ratio = Math.min(maxWidth / w, maxHeight / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderAndOpenSalePopup(){
+  if(routePath() !== '/') return;
+  if(!activeSale || !activeSale.is_active) return;
+  if(sessionStorage.getItem('wj-noir-sale-popup-dismissed') === 'true') return;
   if(document.getElementById('sale-popup-modal')) return;
 
-  const discountVal=Number(activeSale.discount_percentage)||16.67;
-  const discountText=`FLAT ${discountVal}% OFF`;
-  const modal=document.createElement('div');
-  modal.id='sale-popup-modal';
-  modal.className='sale-popup-overlay';
-  modal.innerHTML=`
+  const bannerSrc = activeSale.banner_image || '/assets/wj-noir-11-11-sale-banner.jpg';
+  const modal = document.createElement('div');
+  modal.id = 'sale-popup-modal';
+  modal.className = 'sale-popup-overlay';
+  modal.innerHTML = `
     <div class="sale-popup-backdrop" data-close-sale-popup></div>
-    <div class="sale-popup-container" role="dialog" aria-modal="true" aria-label="Special Sale">
+    <div class="sale-popup-container" role="dialog" aria-modal="true" aria-label="Special Sale Announcement">
       <button type="button" class="sale-popup-close" data-close-sale-popup aria-label="Close sale announcement">×</button>
-      <div class="sale-popup-banner">
-        <img src="${activeSale.banner_image||'/assets/wj-noir-11-11-sale-banner.jpg'}" alt="WJ NOIR Sale Campaign"/>
-      </div>
-      <div class="sale-popup-body">
-        <span class="eyebrow">${escapeHtml(activeSale.campaign_title||'11.11 BIG SALE')}</span>
-        <h2>${escapeHtml(discountText)}</h2>
-        <p>Experience our signature Eau de Parfum creations at exclusive pricing. Limited time only.</p>
+      <a href="/shop" class="sale-popup-image-wrap" data-close-sale-popup aria-label="Discover the sale collection">
+        <img src="${bannerSrc}" alt="${escapeHtml(activeSale.campaign_title || 'WJ NOIR Special Sale')}"/>
+      </a>
+      <div class="sale-popup-footer">
         <a href="/shop" class="button dark-btn sale-popup-btn" data-close-sale-popup>SHOP THE SALE <span>↗</span></a>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
-  requestAnimationFrame(()=>modal.classList.add('is-open'));
+  requestAnimationFrame(() => modal.classList.add('is-open'));
 
-  const dismiss=()=>{
+  const dismiss = () => {
     modal.classList.remove('is-open');
-    sessionStorage.setItem('wj-noir-sale-popup-dismissed','true');
-    setTimeout(()=>modal.remove(),420);
+    sessionStorage.setItem('wj-noir-sale-popup-dismissed', 'true');
+    setTimeout(() => modal.remove(), 420);
   };
-  modal.querySelectorAll('[data-close-sale-popup]').forEach(btn=>btn.addEventListener('click',dismiss));
+  modal.querySelectorAll('[data-close-sale-popup]').forEach(btn => btn.addEventListener('click', dismiss));
+}
+
+function checkAndShowSalePopup(){
+  if(salePopupTimer){
+    clearTimeout(salePopupTimer);
+    salePopupTimer = null;
+  }
+  if(routePath() !== '/') return;
+  if(!activeSale || !activeSale.is_active) return;
+  const now = new Date();
+  if(activeSale.start_date && new Date(activeSale.start_date) > now) return;
+  if(activeSale.end_date && new Date(activeSale.end_date) < now) return;
+  if(sessionStorage.getItem('wj-noir-sale-popup-dismissed') === 'true') return;
+  if(document.getElementById('sale-popup-modal')) return;
+
+  // 5.5s delay on website open before popping up the sale image
+  salePopupTimer = setTimeout(() => {
+    salePopupTimer = null;
+    renderAndOpenSalePopup();
+  }, 5500);
 }
 function setupReveals(){const els=document.querySelectorAll('.reveal'); if(reducedMotion || !('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('is-visible'));return;} const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}})},{threshold:.08,rootMargin:'0px 0px -35px 0px'});els.forEach(e=>io.observe(e));}
 function setupVideo(){
@@ -526,6 +568,10 @@ function route(){
   if(!path.startsWith('/fragrance/') && saleCountdownInterval){
     clearInterval(saleCountdownInterval);
     saleCountdownInterval=null;
+  }
+  if(path !== '/' && salePopupTimer){
+    clearTimeout(salePopupTimer);
+    salePopupTimer=null;
   }
   const p=path.startsWith('/fragrance/')?fragrances.find(x=>x.id===path.split('/')[2]):undefined;
   document.body.classList.toggle('home-route',path==='/');
@@ -846,6 +892,22 @@ function renderAdminSaleSectionMarkup(){
           <label for="admin-sale-end" style="margin-top:10px">End Date & Time (Optional)</label>
           <input type="datetime-local" id="admin-sale-end" value="${formatForDateTimeLocal(s.end_date)}"/>
         </div>
+        <div class="admin-sale-field admin-sale-field--full">
+          <label>Sale Popup Image (5-6s Website Entry)</label>
+          <div class="admin-banner-preview-box">
+            <img id="admin-sale-banner-preview" class="admin-banner-thumb" src="${escapeHtml(s.banner_image || '/assets/wj-noir-11-11-sale-banner.jpg')}" alt="Sale Banner Preview"/>
+            <div class="admin-banner-controls">
+              <strong>Active Popup Graphic</strong>
+              <p style="font-size:12px;color:#78766e;margin:0 0 6px">This image pops up automatically 5 to 6 seconds after a visitor enters the website. Upload any new campaign poster or graphic.</p>
+              <div class="admin-banner-actions">
+                <input type="file" id="admin-sale-banner-file" accept="image/png, image/jpeg, image/webp" style="display:none"/>
+                <button type="button" id="admin-banner-upload-trigger" class="button admin-banner-btn">📁 UPLOAD NEW IMAGE</button>
+                <button type="button" id="admin-banner-reset-trigger" class="button admin-banner-btn admin-banner-btn-secondary">RESET TO 11.11 POSTER</button>
+              </div>
+              <span id="admin-banner-filename" style="font-size:11px;color:#8c897f;display:none;margin-top:4px"></span>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="sale-preview-wrap">
         <h3>Live Calculated Preview</h3>
@@ -884,6 +946,48 @@ function setupAdminSaleControls(client){
   const customChecks = document.querySelectorAll('.admin-custom-product-check');
   const previewTbody = document.getElementById('admin-sale-preview-tbody');
   const saveBtn = document.getElementById('admin-save-sale');
+
+  let stagedBanner = (activeSale && activeSale.banner_image) ? activeSale.banner_image : '/assets/wj-noir-11-11-sale-banner.jpg';
+  const fileInput = document.getElementById('admin-sale-banner-file');
+  const uploadTrigger = document.getElementById('admin-banner-upload-trigger');
+  const resetTrigger = document.getElementById('admin-banner-reset-trigger');
+  const bannerPreview = document.getElementById('admin-sale-banner-preview');
+  const bannerFilename = document.getElementById('admin-banner-filename');
+
+  uploadTrigger?.addEventListener('click', () => fileInput?.click());
+
+  fileInput?.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    uploadTrigger.disabled = true;
+    uploadTrigger.textContent = 'OPTIMIZING...';
+    try {
+      const dataUrl = await compressImageFile(file);
+      stagedBanner = dataUrl;
+      if (bannerPreview) bannerPreview.src = dataUrl;
+      if (bannerFilename) {
+        bannerFilename.textContent = `Ready: ${file.name} (auto-optimized). Click SAVE SALE SETTINGS to publish.`;
+        bannerFilename.style.display = 'block';
+      }
+      showToast('Image loaded and optimized. Click SAVE SALE SETTINGS to publish sitewide.');
+    } catch (err) {
+      console.error('Failed to process uploaded image file.', err);
+      showToast('Could not process this image. Please choose another.');
+    } finally {
+      uploadTrigger.disabled = false;
+      uploadTrigger.textContent = '📁 UPLOAD NEW IMAGE';
+    }
+  });
+
+  resetTrigger?.addEventListener('click', () => {
+    stagedBanner = '/assets/wj-noir-11-11-sale-banner.jpg';
+    if (bannerPreview) bannerPreview.src = stagedBanner;
+    if (bannerFilename) {
+      bannerFilename.textContent = 'Reset to original 11.11 campaign poster.';
+      bannerFilename.style.display = 'block';
+    }
+    showToast('Reset to 11.11 poster. Click SAVE SALE SETTINGS to publish.');
+  });
 
   const updatePreview = () => {
     const isChecked = toggle.checked;
@@ -951,7 +1055,7 @@ function setupAdminSaleControls(client){
         target_product_ids: selectedScope === 'custom' ? selectedCustomIds : ['the-office', 'ice-desire', 'levoria'],
         start_date: startVal ? new Date(startVal).toISOString() : null,
         end_date: endVal ? new Date(endVal).toISOString() : null,
-        banner_image: '/assets/wj-noir-11-11-sale-banner.jpg',
+        banner_image: stagedBanner,
         updated_at: new Date().toISOString()
       };
 
