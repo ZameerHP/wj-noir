@@ -372,11 +372,27 @@ function compressImageFile(file, maxWidth = 1200, maxHeight = 1600, quality = 0.
 
 function isSalePopupDismissed(){
   try {
-    const dismissedAt = localStorage.getItem('wj-noir-sale-popup-dismissed-at');
+    // Clear any persistent 24-hour block from localStorage so users/testers aren't locked out
+    localStorage.removeItem('wj-noir-sale-popup-dismissed-at');
+    localStorage.removeItem('wj-noir-sale-popup-dismissed');
+  } catch(e){}
+
+  try {
+    // Clear session dismissal on page reload so testing always triggers the popup
+    const navEntries = performance.getEntriesByType('navigation');
+    if (navEntries.length > 0 && navEntries[0].type === 'reload') {
+      sessionStorage.removeItem('wj-noir-sale-popup-dismissed-at');
+      return false;
+    }
+  } catch(e){}
+
+  try {
+    const dismissedAt = sessionStorage.getItem('wj-noir-sale-popup-dismissed-at');
     if(!dismissedAt) return false;
     const past = Number(dismissedAt);
     if(isNaN(past)) return false;
-    return (Date.now() - past) < (24 * 60 * 60 * 1000);
+    // Suppress for 10 minutes within the same browsing session
+    return (Date.now() - past) < (10 * 60 * 1000);
   } catch(e) {
     return false;
   }
@@ -384,17 +400,17 @@ function isSalePopupDismissed(){
 
 function markSalePopupDismissed(){
   try {
-    localStorage.setItem('wj-noir-sale-popup-dismissed-at', String(Date.now()));
+    sessionStorage.setItem('wj-noir-sale-popup-dismissed-at', String(Date.now()));
   } catch(e) {}
 }
 
 function renderAndOpenSalePopup(){
   if(routePath() !== '/') return;
-  if(!activeSale || !activeSale.is_active) return;
+  if(activeSale && activeSale.is_active === false) return;
   if(isSalePopupDismissed()) return;
   if(document.getElementById('sale-popup-modal')) return;
 
-  const bannerSrc = activeSale.banner_image || '/assets/wj-noir-11-11-sale-banner.jpg';
+  const bannerSrc = (activeSale && activeSale.banner_image) ? activeSale.banner_image : '/assets/wj-noir-11-11-sale-banner.jpg';
   const modal = document.createElement('div');
   modal.id = 'sale-popup-modal';
   modal.className = 'sale-popup-overlay';
@@ -403,7 +419,7 @@ function renderAndOpenSalePopup(){
     <div class="sale-popup-container" role="dialog" aria-modal="true" aria-label="11.11 Big Sale Announcement">
       <button type="button" class="sale-popup-close" data-close-sale-popup aria-label="Close sale announcement">×</button>
       <a href="/shop" class="sale-popup-image-wrap" data-close-sale-popup aria-label="Shop the 11.11 Big Sale">
-        <img src="${bannerSrc}" alt="${escapeHtml(activeSale.campaign_title || '11.11 Big Sale')}" loading="eager"/>
+        <img src="${bannerSrc}" alt="${escapeHtml(activeSale?.campaign_title || '11.11 Big Sale')}" loading="eager"/>
       </a>
       <div class="sale-popup-footer">
         <span class="sale-popup-kicker">LIMITED TIME · 11.11</span>
@@ -418,7 +434,9 @@ function renderAndOpenSalePopup(){
   document.body.appendChild(modal);
   document.body.classList.add('lock-scroll');
 
-  requestAnimationFrame(() => modal.classList.add('is-open'));
+  setTimeout(() => {
+    modal.classList.add('is-open');
+  }, 40);
 
   const dismiss = () => {
     modal.classList.remove('is-open');
@@ -427,7 +445,7 @@ function renderAndOpenSalePopup(){
     document.removeEventListener('keydown', handleKeyDown);
     setTimeout(() => {
       if(modal.parentNode) modal.parentNode.removeChild(modal);
-    }, 260);
+    }, 280);
   };
 
   const handleKeyDown = (e) => {
@@ -454,27 +472,32 @@ function renderAndOpenSalePopup(){
   setTimeout(() => {
     const cta = modal.querySelector('.sale-popup-btn');
     cta?.focus();
-  }, 100);
+  }, 120);
 }
 
 function checkAndShowSalePopup(){
-  if(salePopupTimer){
-    clearTimeout(salePopupTimer);
-    salePopupTimer = null;
+  if(routePath() !== '/') {
+    if(salePopupTimer){
+      clearTimeout(salePopupTimer);
+      salePopupTimer = null;
+    }
+    return;
   }
-  if(routePath() !== '/') return;
-  if(!activeSale || !activeSale.is_active) return;
+  if(activeSale && activeSale.is_active === false) return;
   const now = new Date();
-  if(activeSale.start_date && new Date(activeSale.start_date) > now) return;
-  if(activeSale.end_date && new Date(activeSale.end_date) < now) return;
+  if(activeSale?.start_date && new Date(activeSale.start_date) > now) return;
+  if(activeSale?.end_date && new Date(activeSale.end_date) < now) return;
   if(isSalePopupDismissed()) return;
   if(document.getElementById('sale-popup-modal')) return;
 
-  // Open after ~2 seconds on page load
+  // If timer is already running towards 7 seconds, let it complete
+  if(salePopupTimer) return;
+
+  // Open reliably 7 seconds after entering website
   salePopupTimer = setTimeout(() => {
     salePopupTimer = null;
     renderAndOpenSalePopup();
-  }, 2000);
+  }, 7000);
 }
 function setupReveals(){const els=document.querySelectorAll('.reveal'); if(reducedMotion || !('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('is-visible'));return;} const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}})},{threshold:.08,rootMargin:'0px 0px -35px 0px'});els.forEach(e=>io.observe(e));}
 function setupVideo(){
