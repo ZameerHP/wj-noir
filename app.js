@@ -247,7 +247,46 @@ function home() { return `
     <section class="closing-visual"><img loading="lazy" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR collection displayed beside a reflective alpine lake"/><div class="closing-overlay"></div><div class="closing-content reveal"><span class="eyebrow">WJ NOIR / THE COLLECTION</span><h2>YOUR NEXT<br/><em>SIGNATURE.</em></h2>${buttonLink('/shop','DISCOVER ALL FRAGRANCES')}</div></section>
   </main>`; }
 function shop() { return `<main class="interior-page"><section class="page-intro shop-intro"><span class="eyebrow ink-muted">WJ NOIR / THE COLLECTION</span><h1>Find your <em>signature.</em></h1><p>Three distinct expressions of the unforgettable. Discover your world.</p></section><div class="shop-filter-row"><span>THE COMPLETE COLLECTION / ${String(fragrances.length).padStart(2, '0')}</span><span>EAU DE PARFUM · 50 ML</span></div><section class="shop-products section-pad"><div class="products-grid">${fragrances.map(p=>card(p)).join('')}</div></section><section class="shop-visual"><img src="${ASSET}dark-collection-alt.webp" alt="WJ NOIR fragrance collection on glossy black rocks" loading="lazy"/><div class="shop-visual-copy"><span class="eyebrow">A WORLD OF DISTINCTION</span><h2>THE NOIR <em>EDIT.</em></h2></div></section></main>`; }
-function about() { return `<main class="interior-page"><section class="about-hero"><img src="${ASSET}dark-collection-alt.webp" alt="Dramatic WJ NOIR perfume campaign on black rocks in an alpine landscape"/><div class="about-hero-shade"></div><div class="about-hero-content reveal"><span class="eyebrow">THE STORY / WJ NOIR</span><h1>NOT MADE<br/>TO <em>BLEND IN.</em></h1><p>A fragrance house inspired by presence, character and the beautiful art of being remembered.</p></div></section><section class="about-copy section-pad"><div class="eyebrow ink-muted">OUR PHILOSOPHY / 001</div><h2>A scent can say<br/>what words <em>cannot.</em></h2><div class="about-copy-bottom"><p>We believe a fragrance is a deeply personal signature. It can be bold or quiet, warm or refreshing, but it should always feel unmistakably yours.</p><p>From the focused confidence of The Office to the icy allure of Ice Desire and the intimate warmth of Lévoria, our collection celebrates three very different ways to leave an impression.</p></div></section><section class="about-strip"><img loading="lazy" src="${ASSET}dark-collection-alt.webp" alt="Three WJ NOIR perfumes arranged in the mountains"/></section><section class="about-cta section-pad"><span class="eyebrow ink-muted">THE INVITATION</span><h2>DISCOVER YOUR<br/><em>OWN SIGNATURE.</em></h2><a class="button dark-btn" href="/shop">EXPLORE THE COLLECTION <span>↗</span></a></section></main>`; }
+function about() {
+  return `<main class="interior-page about-editorial-page">
+    <section class="about-editorial-intro section-pad reveal">
+      <span class="eyebrow ink-muted">THE HOUSE OF WJ NOIR · OUR STORY</span>
+      <h1>Wear your presence.<br/><em>Leave your story.</em></h1>
+      <p class="about-hero-sub">WJ NOIR was founded on a singular conviction: that true luxury never shouts. An entrance you feel. An impression that stays.</p>
+    </section>
+
+    <section class="about-fullbleed-section section-pad">
+      <div class="about-fullbleed-wrap reveal">
+        <img loading="eager" decoding="async" src="${ASSET}dark-collection-alt.webp" alt="WJ NOIR signature fragrance collection on dark alpine stone and water"/>
+        <div class="about-fullbleed-caption">
+          <span>THE NOIR SIGNATURE</span>
+          <span>50 ML EAU DE PARFUM · COMPOSED IN PAKISTAN</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="about-philosophy-section section-pad">
+      <div class="about-philosophy-grid reveal">
+        <div class="about-philosophy-label">
+          <span class="eyebrow ink-muted">THE HOUSE PHILOSOPHY</span>
+        </div>
+        <div class="about-philosophy-body">
+          <h2>A scent can say<br/>what words <em>cannot.</em></h2>
+          <p class="about-philosophy-lead">We believe a fragrance is your unwritten introduction. It does not exist to blend in or mask the moment — it exists to command it.</p>
+          <p>Every formula in the WJ NOIR house is composed with meticulous restraint: from the sharp, focused confidence of <em>The Office</em>, to the crystalline freshness of <em>Ice Desire</em>, to the intimate golden allure of <em>Lévoria</em>. Three distinct expressions, each crafted to become unmistakably yours.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="about-editorial-cta section-pad reveal">
+      <div class="about-cta-card">
+        <span class="eyebrow light-muted">WJ NOIR / THE INVITATION</span>
+        <h2>YOUR NEXT<br/><em>SIGNATURE.</em></h2>
+        <a class="button light-btn" href="/shop"><span>EXPLORE THE COLLECTION</span><span class="arrow-icon">↗</span></a>
+      </div>
+    </section>
+  </main>`;
+}
 function product(p) {
   const related = fragrances.filter(other=>other.id!==p.id);
   const gallery = p.gallery || [p.image,p.altImage,p.image,p.altImage];
@@ -255,7 +294,7 @@ function product(p) {
   const filmPoster = p.id === 'levoria' ? 'wj-noir-levoria-studio.jpg' : p.id === 'ice-desire' ? 'wj-noir-ice-desire-studio.jpg' : 'the-office-poster.jpg';
   const galleryMarkup = `<div class="product-gallery product-gallery--interactive" aria-label="${escapeHtml(p.title)} fragrance gallery">
         <div class="product-gallery-track" id="product-gallery-track" aria-label="Swipe through product images">
-          ${gallery.map((image,index)=>`<figure class="product-gallery-slide" data-gallery-slide="${index}"><button type="button" class="product-gallery-zoom-trigger" data-gallery-zoom="${index}" aria-label="Zoom ${escapeHtml(p.title)} image ${index+1}"><img src="${resolveAssetUrl(image)}" data-fallback="${ASSET}dark-collection.webp" alt="${escapeHtml(p.galleryAlt?.[index]||`WJ NOIR ${p.title} fragrance photograph ${index+1}`)}" width="768" height="1024" loading="eager" fetchpriority="${index===0?'high':'low'}" decoding="async"/></button></figure>`).join('')}
+          ${gallery.map((image,index)=>`<figure class="product-gallery-slide" data-gallery-slide="${index}"><button type="button" class="product-gallery-zoom-trigger" data-gallery-zoom="${index}" aria-label="Zoom ${escapeHtml(p.title)} image ${index+1}"><img src="${resolveAssetUrl(image)}" data-fallback="${ASSET}dark-collection.webp" alt="${escapeHtml(p.galleryAlt?.[index]||`WJ NOIR ${p.title} fragrance photograph ${index+1}`)}" width="768" height="1024" loading="eager" fetchpriority="${index===0?'high':'low'}" decoding="async"/><span class="gallery-zoom-hint" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></span></button></figure>`).join('')}
         </div>
         <div class="product-gallery-thumbnails" role="group" aria-label="Choose a product image">
           ${gallery.map((image,index)=>`<button type="button" class="product-gallery-thumbnail${index===0?' is-active':''}" data-gallery-index="${index}" aria-label="Show image ${index+1}" aria-pressed="${index===0}"><img src="${resolveAssetUrl(image)}" alt="" width="72" height="88" loading="${index===0?'eager':'lazy'}" fetchpriority="low" decoding="async"/></button>`).join('')}
@@ -298,8 +337,32 @@ function product(p) {
           <p class="product-price-note">Cash on delivery available. Your order will be confirmed by email.</p>
         </div>
         <div class="product-accordions">
-          <details class="product-accordion"><summary>Story Behind<span aria-hidden="true"></span></summary><p>${escapeHtml(p.story)}</p></details>
-          <details class="product-accordion"><summary>Fragrance Notes<span aria-hidden="true"></span></summary><div class="product-notes">${p.notes.map(n=>`<div><span>${escapeHtml(n.type)}</span><strong>${escapeHtml(n.note)}</strong><small>${escapeHtml(n.description)}</small></div>`).join('')}</div></details>
+          <details class="product-accordion">
+            <summary>
+              <span>Story Behind</span>
+              <svg class="accordion-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="accordion-content">
+              <p>${escapeHtml(p.story)}</p>
+            </div>
+          </details>
+          <details class="product-accordion" open>
+            <summary>
+              <span>Fragrance Notes</span>
+              <svg class="accordion-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="accordion-content">
+              <div class="product-notes-columns">
+                ${p.notes.map(n=>`
+                  <div class="note-column">
+                    <span class="note-type">${escapeHtml(n.type)}</span>
+                    <strong class="note-title">${escapeHtml(n.note)}</strong>
+                    <small class="note-desc">${escapeHtml(n.description)}</small>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </details>
         </div>
       </div>`;
   const stickyPurchase = `<div class="product-sticky-purchase" aria-hidden="true">
