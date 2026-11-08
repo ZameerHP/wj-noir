@@ -69,6 +69,7 @@ let activeSale = {
 };
 let saleCountdownInterval=null;
 let salePopupTimer=null;
+let catalogRealtimeChannel=null;
 
 try {
   const cached = JSON.parse(localStorage.getItem('wj-noir-sale-settings-cache') || 'null');
@@ -83,6 +84,88 @@ try {
     };
   }
 } catch(e) {}
+
+function loadDeletedProductIds(){
+  try {
+    const fromSale = activeSale?.custom_prices?.__deleted_ids;
+    if (Array.isArray(fromSale)) return fromSale;
+    const raw = localStorage.getItem('wj-noir-deleted-products');
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function loadOutOfStockIds(){
+  try {
+    const fromSale = activeSale?.custom_prices?.__out_of_stock_ids;
+    if (Array.isArray(fromSale)) return fromSale;
+    const raw = localStorage.getItem('wj-noir-out-of-stock-products');
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function isProductOutOfStock(productId){
+  return loadOutOfStockIds().includes(productId);
+}
+
+function isProductDeleted(productId){
+  return loadDeletedProductIds().includes(productId);
+}
+
+function updateMenuDrawerScents(){
+  const container = document.querySelector('.menu-scents');
+  if(!container) return;
+  container.innerHTML = `<p class="menu-section-label">OUR FRAGRANCES</p>` +
+    fragrances.map(p => `
+      <a class="menu-scent" href="/fragrance/${p.id}" data-close="menu">
+        <span>${p.number}</span>
+        <span>${escapeHtml(p.title)}${p.outOfStock ? ' <small style="font-size:9px;color:#b91c1c;letter-spacing:.08em;margin-left:6px">OUT OF STOCK</small>' : ''}</span>
+        <span aria-hidden="true">↗</span>
+      </a>
+    `).join('');
+}
+
+function rebuildFragrancesCatalog(){
+  const deletedIds = loadDeletedProductIds();
+  const oosIds = loadOutOfStockIds();
+  const customList = loadStoredCustomProducts().filter(cp => !deletedIds.includes(cp.id));
+  const activeDefaults = defaultFragrances.filter(df => !deletedIds.includes(df.id));
+  const combined = [...activeDefaults, ...customList];
+  fragrances = combined.map((p, idx) => ({
+    ...p,
+    number: String(idx + 1).padStart(2, '0'),
+    outOfStock: oosIds.includes(p.id)
+  }));
+  const prevLen = cart.length;
+  cart = cart.filter(item => fragrances.some(p => p.id === item.id));
+  if (cart.length !== prevLen) {
+    try { localStorage.setItem(cartStorageKey, JSON.stringify(cart)); } catch(e){}
+  }
+  updateMenuDrawerScents();
+}
+
+rebuildFragrancesCatalog();
+
+function refreshViewOnBackgroundSync(){
+  rebuildFragrancesCatalog();
+  renderBag();
+  const path = routePath();
+  if(path === '/admin'){
+    if(document.querySelector('.admin-navbar')){
+      getSupabase().then(client => renderAdminDashboard(client)).catch(()=>{});
+    }
+    return;
+  }
+  if(path === '/checkout' && document.getElementById('checkout-form')){
+    return;
+  }
+  route();
+}
 
 function getProductPricing(p){
   if(!p) return { isSale:false, originalPrice:0, finalPrice:0, discountPercent:0 };
@@ -142,9 +225,17 @@ async function fetchSaleSettings(){
           ? data.custom_prices
           : (activeSale?.custom_prices || { 'the-office': 2499, 'ice-desire': 2082, 'levoria': 1999 })
       };
+      if(Array.isArray(activeSale.custom_prices?.__deleted_ids)){
+        localStorage.setItem('wj-noir-deleted-products', JSON.stringify(activeSale.custom_prices.__deleted_ids));
+      }
+      if(Array.isArray(activeSale.custom_prices?.__out_of_stock_ids)){
+        localStorage.setItem('wj-noir-out-of-stock-products', JSON.stringify(activeSale.custom_prices.__out_of_stock_ids));
+      }
+      if(Array.isArray(activeSale.custom_prices?.__custom_products)){
+        localStorage.setItem('wj-noir-custom-products', JSON.stringify(activeSale.custom_prices.__custom_products));
+      }
       try { localStorage.setItem('wj-noir-sale-settings-cache', JSON.stringify(activeSale)); } catch(e){}
-      renderBag();
-      route();
+      refreshViewOnBackgroundSync();
       checkAndShowSalePopup();
       return;
     }
@@ -152,8 +243,7 @@ async function fetchSaleSettings(){
     // Falls back to cached activeSale
   }
   if(activeSale){
-    renderBag();
-    route();
+    refreshViewOnBackgroundSync();
     checkAndShowSalePopup();
   }
 }
@@ -162,9 +252,10 @@ async function fetchProductsFromDatabase(){
   try {
     const client = await getSupabase();
     const { data, error } = await client.from('products').select('*').order('created_at', { ascending: true });
-    if(!error && Array.isArray(data) && data.length > 0){
+    if(!error && Array.isArray(data)){
+      const deletedIds = loadDeletedProductIds();
       const dbCustom = data
-        .filter(row => !defaultFragrances.some(df => df.id === row.id))
+        .filter(row => !defaultFragrances.some(df => df.id === row.id) && !deletedIds.includes(row.id))
         .map(row => ({
           id: row.id,
           title: row.title,
@@ -186,14 +277,32 @@ async function fetchProductsFromDatabase(){
           texture: '#1a1a1a',
           isCustom: true
         }));
-      if(dbCustom.length > 0){
-        localStorage.setItem('wj-noir-custom-products', JSON.stringify(dbCustom));
-        fragrances = [...defaultFragrances, ...dbCustom];
-        renderBag();
-        route();
-      }
+      const fallbackCustom = Array.isArray(activeSale?.custom_prices?.__custom_products)
+        ? activeSale.custom_prices.__custom_products.filter(cp => !deletedIds.includes(cp.id))
+        : [];
+      const mergedCustom = [...dbCustom];
+      fallbackCustom.forEach(fc => {
+        if(!mergedCustom.some(mc => mc.id === fc.id)) mergedCustom.push(fc);
+      });
+      localStorage.setItem('wj-noir-custom-products', JSON.stringify(mergedCustom));
+      refreshViewOnBackgroundSync();
     }
   } catch(e) {}
+}
+
+function setupPublicCatalogRealtimeSync(){
+  if(catalogRealtimeChannel) return;
+  getSupabase().then(client => {
+    if(catalogRealtimeChannel) return;
+    catalogRealtimeChannel = client.channel('wj-noir-public-catalog-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sale_settings' }, () => {
+        fetchSaleSettings();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        fetchProductsFromDatabase();
+      })
+      .subscribe();
+  }).catch(() => {});
 }
 
 const cartQuantity = () => cart.reduce((total,item)=>total+item.quantity,0);
@@ -210,19 +319,24 @@ const arrow = `<span class="arrow-icon" aria-hidden="true">↗</span>`;
 const buttonLink = (href, title, variant='light') => `<a class="button ${variant === 'light' ? 'light-btn' : 'outline-btn'}" href="${href}"><span>${title}</span>${arrow}</a>`;
 function card(p, extra='', reveal=true) {
   const pricing = getProductPricing(p);
-  const priceMarkup = pricing.isSale
-    ? `<p class="product-card-price"><span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <strong class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</strong></p>`
-    : (p.showPrice ? `<p class="product-card-price">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</p>` : '');
-  const badge = pricing.isSale
-    ? `<span class="sale-badge">-${Math.round(pricing.discountPercent)}%</span>`
-    : '';
+  const isOOS = Boolean(p.outOfStock || isProductOutOfStock(p.id));
+  const priceMarkup = isOOS
+    ? `<p class="product-card-price"><span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <strong class="price-out-of-stock">OUT OF STOCK</strong></p>`
+    : (pricing.isSale
+      ? `<p class="product-card-price"><span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <strong class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</strong></p>`
+      : (p.showPrice ? `<p class="product-card-price">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</p>` : ''));
+  const badge = isOOS
+    ? `<span class="sale-badge out-of-stock-badge">OUT OF STOCK</span>`
+    : (pricing.isSale
+      ? `<span class="sale-badge">-${Math.round(pricing.discountPercent)}%</span>`
+      : '');
 
   const totalCatalogCount = String(fragrances.length).padStart(2, '0');
-  return `<article class="product-card ${extra} ${reveal?'reveal':''}">
+  return `<article class="product-card ${extra} ${isOOS ? 'is-out-of-stock' : ''} ${reveal?'reveal':''}">
     <a class="product-image-wrap" href="/fragrance/${p.id}" aria-label="Discover ${escapeHtml(p.title)}">
       <img loading="lazy" decoding="async" src="${resolveAssetUrl(p.image)}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/>
       ${badge}
-      <span class="product-hover">DISCOVER FRAGRANCE ↗</span>
+      <span class="product-hover">${isOOS ? 'OUT OF STOCK · VIEW DETAILS ↗' : 'DISCOVER FRAGRANCE ↗'}</span>
       <span class="product-number">${p.number} / ${totalCatalogCount}</span>
     </a>
     <div class="product-card-info">
@@ -306,16 +420,20 @@ function product(p) {
         </div>
       </div>`;
   const pricing = getProductPricing(p);
+  const isOOS = Boolean(p.outOfStock || isProductOutOfStock(p.id));
   const priceDisplayMarkup = pricing.isSale
     ? `<div class="product-detail-price-wrap">
         <div class="product-detail-prices">
           <span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span>
           <strong class="product-detail-price price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</strong>
         </div>
-        <span class="sale-urgency-badge"><span class="sale-urgency-icon">⏳</span> Limited Time Offer</span>
+        ${isOOS
+          ? `<span class="sale-urgency-badge out-of-stock-urgency-badge">● Out of Stock</span>`
+          : `<span class="sale-urgency-badge"><span class="sale-urgency-icon">⏳</span> Limited Time Offer</span>`
+        }
       </div>
-      ${activeSale?.end_date ? `<div id="sale-countdown" class="sale-countdown" data-end="${escapeHtml(activeSale.end_date)}"></div>` : ''}`
-    : (p.showPrice ? `<p class="product-detail-price">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</p>` : '');
+      ${(!isOOS && activeSale?.end_date) ? `<div id="sale-countdown" class="sale-countdown" data-end="${escapeHtml(activeSale.end_date)}"></div>` : ''}`
+    : (p.showPrice ? `<div class="product-detail-price-wrap"><p class="product-detail-price">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</p>${isOOS ? `<span class="sale-urgency-badge out-of-stock-urgency-badge">● Out of Stock</span>` : ''}</div>` : '');
 
   const infoMarkup = `<div class="product-info product-info--editorial">
         <div class="product-overview">
@@ -327,14 +445,19 @@ function product(p) {
         </div>
         <div class="product-purchase">
           <div class="quantity-label">QUANTITY</div>
-          <div class="quantity-control" aria-label="Select quantity">
-            <button type="button" data-quantity-adjust="-1" aria-label="Decrease quantity">−</button>
+          <div class="quantity-control${isOOS ? ' is-disabled-oos' : ''}" aria-label="Select quantity">
+            <button type="button" data-quantity-adjust="-1" aria-label="Decrease quantity" ${isOOS ? 'disabled' : ''}>−</button>
             <output id="product-quantity" aria-live="polite">1</output>
-            <button type="button" data-quantity-adjust="1" aria-label="Increase quantity">+</button>
+            <button type="button" data-quantity-adjust="1" aria-label="Increase quantity" ${isOOS ? 'disabled' : ''}>+</button>
           </div>
-          <button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}">BUY NOW <span>↗</span></button>
-          <button type="button" class="purchase-button purchase-secondary" data-add-cart="${p.id}">ADD TO CART</button>
-          <p class="product-price-note">Cash on delivery available. Your order will be confirmed by email.</p>
+          ${isOOS
+            ? `<button type="button" class="purchase-button purchase-primary is-disabled-oos" disabled aria-disabled="true">OUT OF STOCK</button>
+               <button type="button" class="purchase-button purchase-secondary is-disabled-oos" disabled aria-disabled="true">SOLD OUT · UNAVAILABLE</button>
+               <p class="product-price-note">This fragrance is currently out of stock. Check back soon for restock updates.</p>`
+            : `<button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}">BUY NOW <span>↗</span></button>
+               <button type="button" class="purchase-button purchase-secondary" data-add-cart="${p.id}">ADD TO CART</button>
+               <p class="product-price-note">Cash on delivery available. Your order will be confirmed by email.</p>`
+          }
         </div>
         <div class="product-accordions">
           <details class="product-accordion">
@@ -367,7 +490,10 @@ function product(p) {
       </div>`;
   const stickyPurchase = `<div class="product-sticky-purchase" aria-hidden="true">
         <span class="product-sticky-price">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</span>
-        <button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}" tabindex="-1">BUY NOW <span>↗</span></button>
+        ${isOOS
+          ? `<button type="button" class="purchase-button purchase-primary is-disabled-oos" disabled tabindex="-1">OUT OF STOCK</button>`
+          : `<button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}" tabindex="-1">BUY NOW <span>↗</span></button>`
+        }
       </div>`;
   return `<main class="interior-page product-page product-page--premium"><section class="product-detail-layout">${galleryMarkup}${infoMarkup}</section>${stickyPurchase}<section class="product-film" aria-label="${escapeHtml(p.title)} fragrance film"><video class="product-film-video" muted loop playsinline preload="none" poster="${ASSET+filmPoster}" aria-label="Cinematic WJ NOIR ${escapeHtml(p.title)} perfume film"><source src="${ASSET+film}" type="video/mp4"/></video></section><section class="related-products section-pad"><div class="section-heading-row"><div><span class="eyebrow ink-muted">CONTINUE EXPLORING</span><h2>YOU MAY ALSO <em>LOVE.</em></h2></div><a class="text-link" href="/shop">VIEW ALL <span>↗</span></a></div><div class="products-grid related-grid">${related.map(other=>card(other)).join('')}</div></section></main>`;
 }
@@ -872,6 +998,10 @@ function showToast(message){
 }
 function addToCart(id,quantity=1){
   if(!fragrances.some(p=>p.id===id)||!Number.isSafeInteger(quantity)||quantity<1)return;
+  if(isProductOutOfStock(id)){
+    showToast('This fragrance is currently out of stock.');
+    return;
+  }
   const item=cart.find(entry=>entry.id===id);
   if(item)item.quantity=Math.min(99,item.quantity+quantity);
   else cart.push({id,quantity:Math.min(99,quantity)});
@@ -879,6 +1009,10 @@ function addToCart(id,quantity=1){
 }
 function buyNow(id,quantity=1){
   if(!fragrances.some(p=>p.id===id)||!Number.isSafeInteger(quantity)||quantity<1)return;
+  if(isProductOutOfStock(id)){
+    showToast('This fragrance is currently out of stock.');
+    return;
+  }
   checkoutDraft=[{id,quantity:Math.min(99,quantity)}];
   sessionStorage.setItem('wj-noir-checkout-draft',JSON.stringify(checkoutDraft));
   sessionStorage.setItem('wj-noir-checkout-from-cart','false');
@@ -893,6 +1027,10 @@ function readCheckoutDraft(){
 function adjustCartQuantity(id,change){
   const item=cart.find(entry=>entry.id===id);
   if(!item)return;
+  if(change>0 && isProductOutOfStock(id)){
+    showToast('This fragrance is currently out of stock.');
+    return;
+  }
   item.quantity=Math.max(1,Math.min(99,item.quantity+change));
   saveCart();
 }
@@ -901,10 +1039,13 @@ function cartItemMarkup(item){
   const p=fragrances.find(product=>product.id===item.id);
   if(!p)return '';
   const pricing = getProductPricing(p);
-  const priceDisplay = pricing.isSale
-    ? `<strong><span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <span class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</span></strong>`
-    : `<strong>PKR ${pricing.originalPrice.toLocaleString('en-PK')}</strong>`;
-  return `<div class="bag-item"><img src="${resolveAssetUrl(p.image)}" alt="${escapeHtml(p.title)}"/><div><span class="eyebrow ink-muted">EAU DE PARFUM / 50 ML</span><h3>${escapeHtml(p.title)}</h3>${priceDisplay}<div class="bag-quantity"><button type="button" data-cart-adjust="-1" data-cart-id="${p.id}" aria-label="Remove one ${escapeHtml(p.title)}">−</button><span>QTY ${item.quantity}</span><button type="button" data-cart-adjust="1" data-cart-id="${p.id}" aria-label="Add one ${escapeHtml(p.title)}">+</button></div><button type="button" data-cart-remove="${p.id}" class="remove-link">REMOVE ×</button></div></div>`;
+  const isOOS = Boolean(p.outOfStock || isProductOutOfStock(p.id));
+  const priceDisplay = isOOS
+    ? `<strong class="price-out-of-stock">OUT OF STOCK</strong>`
+    : (pricing.isSale
+        ? `<strong><span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <span class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</span></strong>`
+        : `<strong>PKR ${pricing.originalPrice.toLocaleString('en-PK')}</strong>`);
+  return `<div class="bag-item${isOOS?' is-out-of-stock':''}"><img src="${resolveAssetUrl(p.image)}" alt="${escapeHtml(p.title)}"/><div><span class="eyebrow ink-muted">EAU DE PARFUM / 50 ML</span><h3>${escapeHtml(p.title)}</h3>${priceDisplay}<div class="bag-quantity"><button type="button" data-cart-adjust="-1" data-cart-id="${p.id}" aria-label="Remove one ${escapeHtml(p.title)}">−</button><span>QTY ${item.quantity}</span><button type="button" data-cart-adjust="1" data-cart-id="${p.id}" aria-label="Add one ${escapeHtml(p.title)}" ${isOOS?'disabled':''}>+</button></div><button type="button" data-cart-remove="${p.id}" class="remove-link">REMOVE ×</button></div></div>`;
 }
 function renderBag(){
   const count=cartQuantity();
@@ -925,11 +1066,14 @@ function checkoutPage(){
     const p=fragrances.find(product=>product.id===item.id);
     if(!p) return '';
     const pricing = getProductPricing(p);
+    const isOOS = Boolean(p.outOfStock || isProductOutOfStock(p.id));
     const lineTotal = pricing.finalPrice * item.quantity;
-    const priceDisplay = pricing.isSale
-      ? `<b><span class="price-original">PKR ${(pricing.originalPrice*item.quantity).toLocaleString('en-PK')}</span> <span class="price-sale">PKR ${lineTotal.toLocaleString('en-PK')}</span></b>`
-      : `<b>PKR ${lineTotal.toLocaleString('en-PK')}</b>`;
-    return `<div class="checkout-item"><img src="${resolveAssetUrl(p.image)}" alt=""/><div><strong>${escapeHtml(p.title)}</strong><span>50 ml · Eau de Parfum · Qty ${item.quantity}</span></div>${priceDisplay}</div>`;
+    const priceDisplay = isOOS
+      ? `<b class="price-out-of-stock">OUT OF STOCK</b>`
+      : (pricing.isSale
+          ? `<b><span class="price-original">PKR ${(pricing.originalPrice*item.quantity).toLocaleString('en-PK')}</span> <span class="price-sale">PKR ${lineTotal.toLocaleString('en-PK')}</span></b>`
+          : `<b>PKR ${lineTotal.toLocaleString('en-PK')}</b>`);
+    return `<div class="checkout-item"><img src="${resolveAssetUrl(p.image)}" alt=""/><div><strong>${escapeHtml(p.title)}</strong><span>50 ml · Eau de Parfum · Qty ${item.quantity}${isOOS ? ' · OUT OF STOCK' : ''}</span></div>${priceDisplay}</div>`;
   }).join('');
   return `<main class="commerce-page checkout-page"><a class="commerce-back-link" href="/shop">← CONTINUE EXPLORING</a><div class="commerce-heading"><span class="eyebrow ink-muted">WJ NOIR / CHECKOUT</span><h1>Complete your <em>order.</em></h1><p>We will contact you to confirm delivery details.</p></div><div class="checkout-layout"><form id="checkout-form" class="checkout-form" novalidate><h2>Delivery details</h2><div class="checkout-field"><label for="customer-name">Full name</label><input id="customer-name" name="customer_name" autocomplete="name" maxlength="120" required/></div><div class="checkout-field"><label for="customer-email">Email</label><input id="customer-email" name="email" type="email" autocomplete="email" maxlength="254" required/></div><div class="checkout-field"><label for="customer-phone">Phone number</label><input id="customer-phone" name="phone" type="tel" autocomplete="tel" maxlength="30" required/><small>Include at least 10 digits.</small></div><div class="checkout-field"><label for="customer-address">Street address</label><input id="customer-address" name="address" autocomplete="street-address" maxlength="300" required/></div><div class="checkout-field-grid"><div class="checkout-field"><label for="customer-city">City</label><input id="customer-city" name="city" autocomplete="address-level2" maxlength="100" required/></div><div class="checkout-field"><label for="customer-state">State / province</label><input id="customer-state" name="state" autocomplete="address-level1" maxlength="100" required/></div><div class="checkout-field"><label for="customer-postal-code">Postal code</label><input id="customer-postal-code" name="postal_code" autocomplete="postal-code" maxlength="20" required/></div><div class="checkout-field"><label for="customer-country">Country</label><input id="customer-country" name="country" autocomplete="country-name" maxlength="100" required/></div></div><div class="checkout-field"><label for="order-notes">Order notes <span>(optional)</span></label><textarea id="order-notes" name="notes" rows="3" maxlength="1000"></textarea></div><fieldset class="payment-choice"><legend>Payment method</legend><label><input type="radio" name="payment_method" value="Cash on Delivery" checked/><span><strong>Cash on Delivery</strong><small>Pay when your order arrives.</small></span></label></fieldset><p id="checkout-error" class="form-message" role="alert" hidden></p><button id="place-order" type="submit" class="button dark-btn checkout-submit">PLACE ORDER · PKR ${cartSubtotal(items).toLocaleString('en-PK')}</button></form><aside class="checkout-summary"><h2>Order summary</h2>${rows}<div class="checkout-total"><span>Total</span><strong>PKR ${cartSubtotal(items).toLocaleString('en-PK')}</strong></div><p>50 ml · Eau de Parfum</p></aside></div></main>`;
 }
@@ -973,6 +1117,13 @@ function setupCheckout(){
     if(!form.reportValidity())return;
     const items=currentCheckoutItems();
     if(!items.length){errorMessage.textContent='Your cart is empty.';errorMessage.hidden=false;return;}
+    const oosItem=items.find(item=>isProductOutOfStock(item.id)||isProductDeleted(item.id));
+    if(oosItem){
+      const oosProd=fragrances.find(p=>p.id===oosItem.id);
+      errorMessage.textContent=`"${oosProd?oosProd.title:'An item in your bag'}" is currently out of stock. Please remove it from your bag to continue.`;
+      errorMessage.hidden=false;
+      return;
+    }
     if(checkoutSubmitting)return;
     checkoutSubmitting=true;submit.disabled=true;submit.textContent='PLACING YOUR ORDER…';
     try{
@@ -1284,7 +1435,11 @@ function setupAdminSaleControls(client){
   });
 
   const getCustomPricesFromInputs = () => {
-    const prices = {};
+    const prices = {
+      __deleted_ids: loadDeletedProductIds(),
+      __out_of_stock_ids: loadOutOfStockIds(),
+      __custom_products: loadStoredCustomProducts()
+    };
     customPriceInputs.forEach(input => {
       const pid = input.dataset.productId;
       const val = Number(input.value);
@@ -1353,6 +1508,7 @@ function setupAdminSaleControls(client){
 
       let effectivePrice = p.price;
       let statusText = '';
+      const isOOS = Boolean(p.outOfStock || isProductOutOfStock(p.id));
 
       if(!isChecked){
         statusText = '<span class="sale-preview-inactive">Standard (Sale OFF)</span>';
@@ -1365,6 +1521,10 @@ function setupAdminSaleControls(client){
         statusText = `<span class="sale-preview-active">Formula Active (-${discount}%)</span>`;
       } else {
         statusText = '<span class="sale-preview-inactive">Standard (Excluded)</span>';
+      }
+
+      if(isOOS){
+        statusText += ` <span class="admin-stock-pill is-oos" style="margin-left:6px">OUT OF STOCK</span>`;
       }
 
       return `<tr>
@@ -1408,7 +1568,7 @@ function setupAdminSaleControls(client){
         discount_percentage: discount,
         target_type: selectedScope,
         target_category: selectedScope === 'category' ? selectedCategory : null,
-        target_product_ids: selectedScope === 'custom' ? selectedCustomIds : ['the-office', 'ice-desire', 'levoria'],
+        target_product_ids: selectedScope === 'custom' ? selectedCustomIds : fragrances.map(f => f.id),
         start_date: startVal ? new Date(startVal).toISOString() : null,
         end_date: endVal ? new Date(endVal).toISOString() : null,
         banner_image: stagedBanner,
@@ -1422,7 +1582,6 @@ function setupAdminSaleControls(client){
       activeSale = payload;
       try { localStorage.setItem('wj-noir-sale-settings-cache', JSON.stringify(payload)); } catch(e){}
       renderBag();
-      route();
       showToast(isChecked ? 'Sale settings saved. Prices updated successfully sitewide.' : 'Sale settings saved. Sale is OFF.');
       updatePreview();
     } catch(err) {
@@ -1435,9 +1594,142 @@ function setupAdminSaleControls(client){
   });
 }
 
+async function syncCatalogStateToSupabase(client, nextDeletedIds, nextOutOfStockIds, nextCustomProducts){
+  try {
+    localStorage.setItem('wj-noir-deleted-product-ids', JSON.stringify(nextDeletedIds));
+    localStorage.setItem('wj-noir-out-of-stock-ids', JSON.stringify(nextOutOfStockIds));
+    localStorage.setItem('wj-noir-custom-products', JSON.stringify(nextCustomProducts));
+  } catch(e){}
+
+  const existingSale = activeSale || {
+    id: 'active',
+    is_active: true,
+    campaign_title: '11.11 BIG SALE',
+    discount_percentage: 16.67,
+    target_type: 'all',
+    target_category: null,
+    target_product_ids: ['the-office', 'ice-desire', 'levoria'],
+    start_date: null,
+    end_date: null,
+    banner_image: '/assets/wj-noir-11-11-sale-banner.jpg',
+    custom_prices: {
+      'the-office': 2499,
+      'ice-desire': 2082,
+      'levoria': 1999
+    }
+  };
+
+  const baseCustomPrices = (existingSale.custom_prices && typeof existingSale.custom_prices === 'object')
+    ? { ...existingSale.custom_prices }
+    : { 'the-office': 2499, 'ice-desire': 2082, 'levoria': 1999 };
+
+  baseCustomPrices.__deleted_ids = nextDeletedIds;
+  baseCustomPrices.__out_of_stock_ids = nextOutOfStockIds;
+  baseCustomPrices.__custom_products = nextCustomProducts;
+
+  const nextPayload = {
+    id: 'active',
+    is_active: Boolean(existingSale.is_active),
+    campaign_title: existingSale.campaign_title || '11.11 BIG SALE',
+    discount_percentage: existingSale.discount_percentage ?? 16.67,
+    target_type: existingSale.target_type || 'all',
+    target_category: existingSale.target_category || null,
+    target_product_ids: Array.isArray(existingSale.target_product_ids) ? existingSale.target_product_ids : ['the-office', 'ice-desire', 'levoria'],
+    start_date: existingSale.start_date || null,
+    end_date: existingSale.end_date || null,
+    banner_image: existingSale.banner_image || '/assets/wj-noir-11-11-sale-banner.jpg',
+    custom_prices: baseCustomPrices,
+    updated_at: new Date().toISOString()
+  };
+
+  activeSale = nextPayload;
+  try { localStorage.setItem('wj-noir-sale-settings-cache', JSON.stringify(nextPayload)); } catch(e){}
+  rebuildFragrancesCatalog();
+
+  if(client){
+    const { error } = await client.from('sale_settings').upsert(nextPayload);
+    if(error) throw new Error(error.message);
+  }
+}
+
 function renderAdminProductsMarkup(){
+  const deletedIds = loadDeletedProductIds();
+  const outOfStockIds = loadOutOfStockIds();
+  const deletedCoreProducts = defaultFragrances.filter(d => deletedIds.includes(d.id));
+  const oosCount = fragrances.filter(p => outOfStockIds.includes(p.id) || p.outOfStock).length;
+
   return `
     <div class="admin-products-section">
+      <div class="admin-existing-products">
+        <div class="admin-catalog-header-row">
+          <div>
+            <span class="eyebrow ink-muted">WJ NOIR / INVENTORY &amp; CATALOGUE CONTROL</span>
+            <h2 style="margin:4px 0 0;font-family:var(--serif);font-size:28px;font-weight:400">Manage Perfumes · Stock &amp; Delete (${fragrances.length})</h2>
+            <p style="font-size:13px;color:#78766e;margin:6px 0 0">Mark any fragrance Out of Stock or In Stock, or delete products from the store. Every change syncs across the entire website immediately.</p>
+          </div>
+          <div class="admin-catalog-summary-pills">
+            <span class="admin-stock-pill is-instock">● ${fragrances.length - oosCount} IN STOCK</span>
+            <span class="admin-stock-pill is-oos">● ${oosCount} OUT OF STOCK</span>
+          </div>
+        </div>
+
+        ${fragrances.length ? `
+          <div class="admin-catalog-grid">
+            ${fragrances.map(p => {
+              const isCustom = !['the-office', 'ice-desire', 'levoria'].includes(p.id);
+              const isOOS = Boolean(p.outOfStock || outOfStockIds.includes(p.id));
+              const pricing = getProductPricing(p);
+              return `
+                <div class="admin-catalog-card ${isOOS ? 'is-oos-card' : ''}">
+                  <div class="admin-catalog-badges-row">
+                    <span class="admin-catalog-badge ${isCustom ? 'is-custom' : ''}">${isCustom ? 'CUSTOM ADDED' : 'CORE SIGNATURE'}</span>
+                    <span class="admin-stock-pill ${isOOS ? 'is-oos' : 'is-instock'}">${isOOS ? '● OUT OF STOCK' : '● IN STOCK'}</span>
+                  </div>
+                  <img class="admin-catalog-thumb" src="${resolveAssetUrl(p.image)}" alt="${escapeHtml(p.title)}"/>
+                  <div class="admin-catalog-info">
+                    <span>${p.number} · ${escapeHtml(p.category)}</span>
+                    <strong>${escapeHtml(p.title)}</strong>
+                    <div class="catalog-price">
+                      ${pricing.isSale
+                        ? `<span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <strong class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</strong>`
+                        : `PKR ${p.price.toLocaleString('en-PK')}`
+                      }
+                    </div>
+                    <a href="/fragrance/${p.id}" target="_blank" style="font-size:11px;color:#a8803a;text-decoration:underline">View in store ↗</a>
+                    <div class="admin-catalog-actions">
+                      <button type="button" class="admin-stock-toggle-btn ${isOOS ? 'is-oos' : 'is-instock'}" data-toggle-stock="${p.id}">
+                        ${isOOS ? '✓ MARK IN STOCK' : '🚫 MARK OUT OF STOCK'}
+                      </button>
+                      <button type="button" class="admin-delete-prod-btn" data-delete-product="${p.id}">
+                        🗑️ DELETE PRODUCT
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : `
+          <p class="admin-empty">All products have been deleted from the active storefront. Add a new fragrance below or restore a core signature fragrance.</p>
+        `}
+
+        ${deletedCoreProducts.length ? `
+          <div class="admin-deleted-core-wrap">
+            <div>
+              <strong>Deleted Signature Fragrances (${deletedCoreProducts.length})</strong>
+              <p>These original WJ NOIR house fragrances are currently hidden/deleted from the storefront. You can restore them anytime:</p>
+            </div>
+            <div class="admin-deleted-core-list">
+              ${deletedCoreProducts.map(d => `
+                <button type="button" class="admin-restore-core-btn" data-restore-product="${d.id}">
+                  ↺ RESTORE ${escapeHtml(d.upper)}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+
       <div class="admin-product-create-card">
         <div class="admin-product-create-header">
           <div>
@@ -1464,6 +1756,13 @@ function renderAdminProductsMarkup(){
               <input type="number" id="new-product-price" step="1" min="1" required placeholder="e.g. 2999"/>
             </div>
             <div class="admin-product-field">
+              <label for="new-product-stock">Stock Status *</label>
+              <select id="new-product-stock" required>
+                <option value="in_stock" selected>In Stock (Available to Order)</option>
+                <option value="out_of_stock">Out of Stock (Sold Out Badge)</option>
+              </select>
+            </div>
+            <div class="admin-product-field">
               <label for="new-product-tagline">Tagline / Short Hook</label>
               <input id="new-product-tagline" placeholder="e.g. Command your presence."/>
             </div>
@@ -1471,7 +1770,7 @@ function renderAdminProductsMarkup(){
               <label for="new-product-intro">Intro Summary</label>
               <input id="new-product-intro" placeholder="e.g. Warm. Enigmatic. Unforgettable."/>
             </div>
-            <div class="admin-product-field">
+            <div class="admin-product-field admin-product-field--full">
               <label for="new-product-tones">Key Tones (Comma-separated)</label>
               <input id="new-product-tones" placeholder="e.g. AMBER, OUD, SPICED"/>
             </div>
@@ -1505,39 +1804,6 @@ function renderAdminProductsMarkup(){
             <button type="submit" id="admin-product-submit" class="admin-product-submit-btn">+ LAUNCH &amp; PUBLISH FRAGRANCE</button>
           </div>
         </form>
-      </div>
-
-      <div class="admin-existing-products">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
-          <div>
-            <span class="eyebrow ink-muted">WJ NOIR / CATALOGUE</span>
-            <h3 style="margin:4px 0 0">All Active Perfumes (${fragrances.length})</h3>
-          </div>
-        </div>
-        <div class="admin-catalog-grid">
-          ${fragrances.map(p => {
-            const isCustom = !['the-office', 'ice-desire', 'levoria'].includes(p.id);
-            const pricing = getProductPricing(p);
-            return `
-              <div class="admin-catalog-card">
-                <span class="admin-catalog-badge ${isCustom ? 'is-custom' : ''}">${isCustom ? 'CUSTOM ADDED' : 'CORE SIGNATURE'}</span>
-                <img class="admin-catalog-thumb" src="${resolveAssetUrl(p.image)}" alt="${escapeHtml(p.title)}"/>
-                <div class="admin-catalog-info">
-                  <span>${p.number} · ${escapeHtml(p.category)}</span>
-                  <strong>${escapeHtml(p.title)}</strong>
-                  <div class="catalog-price">
-                    ${pricing.isSale
-                      ? `<span class="price-original">PKR ${pricing.originalPrice.toLocaleString('en-PK')}</span> <strong class="price-sale">PKR ${pricing.finalPrice.toLocaleString('en-PK')}</strong>`
-                      : `PKR ${p.price.toLocaleString('en-PK')}`
-                    }
-                  </div>
-                  <a href="/fragrance/${p.id}" target="_blank" style="font-size:11px;color:#a8803a;text-decoration:underline">View in store ↗</a>
-                  ${isCustom ? `<button type="button" class="admin-delete-prod-btn" data-delete-custom-product="${p.id}">REMOVE PRODUCT</button>` : ''}
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
       </div>
     </div>
   `;
@@ -1592,6 +1858,8 @@ function setupAdminProductsControls(client){
       const category = document.getElementById('new-product-category').value;
       const price = Number(document.getElementById('new-product-price').value);
       if(!price || price <= 0) throw new Error('Please enter a valid price in PKR.');
+      const stockChoice = document.getElementById('new-product-stock')?.value || 'in_stock';
+      const isInitialOOS = stockChoice === 'out_of_stock';
       const tagline = document.getElementById('new-product-tagline').value.trim();
       const intro = document.getElementById('new-product-intro').value.trim();
       const description = document.getElementById('new-product-description').value.trim();
@@ -1603,7 +1871,7 @@ function setupAdminProductsControls(client){
       let baseId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'perfume';
       let id = baseId;
       let counter = 1;
-      while(fragrances.some(f => f.id === id)){
+      while(fragrances.some(f => f.id === id) || defaultFragrances.some(f => f.id === id)){
         counter++;
         id = `${baseId}-${counter}`;
       }
@@ -1638,12 +1906,18 @@ function setupAdminProductsControls(client){
         notes,
         number: nextNum,
         texture: '#1a1a1a',
-        isCustom: true
+        isCustom: true,
+        outOfStock: isInitialOOS
       };
 
-      const customProducts = loadStoredCustomProducts();
+      const customProducts = loadStoredCustomProducts().filter(p => p.id !== id);
       customProducts.push(newProduct);
-      localStorage.setItem('wj-noir-custom-products', JSON.stringify(customProducts));
+
+      const deletedIds = loadDeletedProductIds().filter(dId => dId !== id);
+      let outOfStockIds = loadOutOfStockIds().filter(oId => oId !== id);
+      if(isInitialOOS) outOfStockIds.push(id);
+
+      await syncCatalogStateToSupabase(client, deletedIds, outOfStockIds, customProducts);
 
       try {
         await client.from('products').upsert({
@@ -1668,9 +1942,7 @@ function setupAdminProductsControls(client){
         console.warn('Database table "products" sync deferred:', dbErr);
       }
 
-      fragrances = [...defaultFragrances, ...customProducts];
-
-      showToast(`✨ "${title}" has been launched and added to the store catalog!`);
+      showToast(`✨ "${title}" has been launched and synced across the store!`);
       sessionStorage.setItem('wj-noir-admin-tab', 'products');
       renderAdminDashboard(client);
     } catch(err) {
@@ -1681,27 +1953,112 @@ function setupAdminProductsControls(client){
     }
   });
 
-  document.querySelectorAll('[data-delete-custom-product]').forEach(btn => {
+  // Toggle Stock Status (In Stock <-> Out of Stock) for ANY product
+  document.querySelectorAll('[data-toggle-stock]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const pid = btn.dataset.deleteCustomProduct;
+      const pid = btn.dataset.toggleStock;
       const prod = fragrances.find(p => p.id === pid);
-      const title = prod ? prod.title : 'this product';
-      if(!window.confirm(`Are you sure you want to remove "${title}" from the store catalog?`)) return;
+      const title = prod ? prod.title : 'Product';
+      const currentlyOOS = isProductOutOfStock(pid);
 
       btn.disabled = true;
-      btn.textContent = 'REMOVING...';
-
-      let customProducts = loadStoredCustomProducts().filter(p => p.id !== pid);
-      localStorage.setItem('wj-noir-custom-products', JSON.stringify(customProducts));
+      btn.textContent = 'SYNCING...';
 
       try {
-        await client.from('products').delete().eq('id', pid);
-      } catch(e){}
+        const deletedIds = loadDeletedProductIds();
+        let outOfStockIds = loadOutOfStockIds();
+        if(currentlyOOS){
+          outOfStockIds = outOfStockIds.filter(id => id !== pid);
+        } else if(!outOfStockIds.includes(pid)){
+          outOfStockIds.push(pid);
+        }
+        const customProducts = loadStoredCustomProducts().map(cp =>
+          cp.id === pid ? { ...cp, outOfStock: !currentlyOOS } : cp
+        );
 
-      fragrances = [...defaultFragrances, ...customProducts];
-      showToast(`"${title}" has been removed.`);
-      sessionStorage.setItem('wj-noir-admin-tab', 'products');
-      renderAdminDashboard(client);
+        await syncCatalogStateToSupabase(client, deletedIds, outOfStockIds, customProducts);
+
+        showToast(!currentlyOOS
+          ? `🚫 "${title}" marked OUT OF STOCK across the store.`
+          : `✓ "${title}" is back IN STOCK across the store.`);
+        sessionStorage.setItem('wj-noir-admin-tab', 'products');
+        renderAdminDashboard(client);
+      } catch(err) {
+        console.error('Failed to toggle product stock status.', err);
+        showToast(err.message || 'Unable to sync stock status.');
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // Delete ANY product (Core or Custom)
+  document.querySelectorAll('[data-delete-product]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pid = btn.dataset.deleteProduct;
+      const prod = fragrances.find(p => p.id === pid);
+      const title = prod ? prod.title : 'this product';
+      const isCore = ['the-office', 'ice-desire', 'levoria'].includes(pid);
+      const confirmMsg = isCore
+        ? `Remove "${title}" from the store catalog? (As a core signature fragrance, you can restore it anytime from this page.)`
+        : `Permanently delete "${title}" from the store catalog?`;
+      if(!window.confirm(confirmMsg)) return;
+
+      btn.disabled = true;
+      btn.textContent = 'DELETING...';
+
+      try {
+        let deletedIds = loadDeletedProductIds();
+        if(isCore && !deletedIds.includes(pid)){
+          deletedIds.push(pid);
+        }
+        const outOfStockIds = loadOutOfStockIds().filter(id => id !== pid);
+        const customProducts = loadStoredCustomProducts().filter(p => p.id !== pid);
+
+        await syncCatalogStateToSupabase(client, deletedIds, outOfStockIds, customProducts);
+
+        if(!isCore){
+          try {
+            await client.from('products').delete().eq('id', pid);
+          } catch(e){}
+        }
+
+        showToast(`🗑️ "${title}" has been deleted and synced sitewide.`);
+        sessionStorage.setItem('wj-noir-admin-tab', 'products');
+        renderAdminDashboard(client);
+      } catch(err) {
+        console.error('Failed to delete product.', err);
+        showToast(err.message || 'Unable to delete product.');
+        btn.disabled = false;
+        btn.textContent = '🗑️ DELETE PRODUCT';
+      }
+    });
+  });
+
+  // Restore a deleted Core Signature fragrance
+  document.querySelectorAll('[data-restore-product]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pid = btn.dataset.restoreProduct;
+      const coreProd = defaultFragrances.find(d => d.id === pid);
+      const title = coreProd ? coreProd.title : pid;
+
+      btn.disabled = true;
+      btn.textContent = 'RESTORING...';
+
+      try {
+        const deletedIds = loadDeletedProductIds().filter(id => id !== pid);
+        const outOfStockIds = loadOutOfStockIds();
+        const customProducts = loadStoredCustomProducts();
+
+        await syncCatalogStateToSupabase(client, deletedIds, outOfStockIds, customProducts);
+
+        showToast(`↺ "${title}" has been restored to the store catalog!`);
+        sessionStorage.setItem('wj-noir-admin-tab', 'products');
+        renderAdminDashboard(client);
+      } catch(err) {
+        console.error('Failed to restore core fragrance.', err);
+        showToast(err.message || 'Unable to restore fragrance.');
+        btn.disabled = false;
+      }
     });
   });
 }
@@ -1733,7 +2090,7 @@ function renderAdminDashboard(client){
         <span class="admin-nav-badge-sale ${activeSale?.is_active ? 'is-on' : 'is-off'}">${activeSale?.is_active ? 'ON' : 'OFF'}</span>
       </button>
       <button type="button" class="admin-nav-item ${activeTab === 'products' ? 'is-active' : ''}" data-admin-tab="products">
-        <span>✨ NEW PRODUCT</span>
+        <span>✨ PRODUCTS &amp; STOCK</span>
         <span class="admin-nav-badge">${fragrances.length}</span>
       </button>
     </nav>
@@ -1967,7 +2324,7 @@ function setupGlobalCommerceActions(){
     }
   });
 }
-function renderSearch(){const q=document.getElementById('search-input').value.trim().toLowerCase();const results=fragrances.filter(p=>!q||[p.title,p.category,p.tagline,...p.tones,...p.notes.map(n=>n.note)].join(' ').toLowerCase().includes(q));document.getElementById('search-results').innerHTML=results.length?results.map(p=>`<a class="search-result" href="/fragrance/${p.id}" data-close="search"><img src="${resolveAssetUrl(p.image)}" alt=""/><span><small>${p.category} · EAU DE PARFUM</small><strong>${p.title}</strong><small>${p.tones.join(' / ')}</small></span><i>↗</i></a>`).join(''):`<div class="search-empty">No fragrance matched your search. Try “woody”, “ice” or “vanilla”.</div>`;}
+function renderSearch(){const q=document.getElementById('search-input').value.trim().toLowerCase();const results=fragrances.filter(p=>!q||[p.title,p.category,p.tagline,...p.tones,...p.notes.map(n=>n.note)].join(' ').toLowerCase().includes(q));document.getElementById('search-results').innerHTML=results.length?results.map(p=>{const isOOS=Boolean(p.outOfStock||isProductOutOfStock(p.id));return `<a class="search-result" href="/fragrance/${p.id}" data-close="search"><img src="${resolveAssetUrl(p.image)}" alt=""/><span><small>${escapeHtml(p.category)} · EAU DE PARFUM${isOOS?' · OUT OF STOCK':''}</small><strong>${escapeHtml(p.title)}</strong><small>${p.tones.join(' / ')}</small></span><i>↗</i></a>`;}).join(''):`<div class="search-empty">No fragrance matched your search. Try “woody”, “ice” or “vanilla”.</div>`;}
 document.getElementById('menu-toggle').addEventListener('click',()=>toggleOverlay('menu'));
 document.getElementById('search-toggle').addEventListener('click',()=>toggleOverlay('search'));
 document.getElementById('bag-toggle').addEventListener('click',()=>toggleOverlay('bag'));
@@ -1976,7 +2333,17 @@ document.addEventListener('click',e=>{const closest=e.target.closest('[data-clos
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.querySelector('.product-image-zoom.is-open'))closeGalleryZoom();else closeAll();}});
 document.getElementById('newsletter-form').addEventListener('submit',e=>{e.preventDefault();document.getElementById('newsletter-message').textContent='Preview only: connect your newsletter provider before launch.';});
 document.getElementById('year').textContent=new Date().getFullYear();
-window.addEventListener('hashchange',route);window.addEventListener('popstate',route);setupGlobalCommerceActions();renderBag();route();fetchSaleSettings();fetchProductsFromDatabase();
+window.addEventListener('storage',e=>{
+  if(['wj-noir-deleted-product-ids','wj-noir-out-of-stock-ids','wj-noir-custom-products','wj-noir-sale-settings-cache'].includes(e.key)){
+    try{
+      const cachedSale=localStorage.getItem('wj-noir-sale-settings-cache');
+      if(cachedSale)activeSale=JSON.parse(cachedSale);
+    }catch(err){}
+    rebuildFragrancesCatalog();
+    refreshViewOnBackgroundSync();
+  }
+});
+window.addEventListener('hashchange',route);window.addEventListener('popstate',route);setupGlobalCommerceActions();rebuildFragrancesCatalog();renderBag();route();fetchSaleSettings();fetchProductsFromDatabase();setupPublicCatalogRealtimeSync();
 window.addEventListener('load',()=>{setTimeout(()=>document.getElementById('loading-screen').classList.add('done'),100);});setTimeout(()=>document.getElementById('loading-screen').classList.add('done'),2800);
 
 

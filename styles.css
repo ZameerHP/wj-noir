@@ -2364,3 +2364,233 @@ body.home-route .site-header .bag-count{background:#fff;color:#171714}
   .about-philosophy-grid{grid-template-columns:1fr;gap:20px}
   .about-fullbleed-wrap{aspect-ratio:4/3}
 }
+
+/* Out of Stock Storefront & Admin Stock/Delete Controls */
+.out-of-stock-badge{
+  background:rgba(20, 21, 19, .88) !important;
+  color:#e8e4da !important;
+  border:1px solid rgba(255,255,255,.22) !important;
+  box-shadow:0 4px 12px rgba(0,0,0,.35) !important;
+}
+.product-card.is-out-of-stock .product-photo img{
+  filter:saturate(.68) contrast(.96);
+}
+.price-out-of-stock{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.14em;
+  color:#991b1b;
+  background:#fef2f2;
+  border:1px solid #fecaca;
+  padding:4px 9px;
+  border-radius:4px;
+  text-transform:uppercase;
+}
+.out-of-stock-urgency-badge{
+  color:#991b1b !important;
+  background:rgba(153, 27, 27, .08) !important;
+  border:1px solid rgba(153, 27, 27, .25) !important;
+}
+.quantity-control.is-disabled-oos{
+  opacity:.45;
+  pointer-events:none;
+}
+.purchase-button.is-disabled-oos{
+  opacity:.55 !important;
+  cursor:not-allowed !important;
+  transform:none !important;
+  box-shadow:none !important;
+}
+.purchase-primary.is-disabled-oos{
+  background:#5c5b55 !important;
+  border-color:#5c5b55 !important;
+  color:#f4f2ec !important;
+}
+.purchase-secondary.is-disabled-oos{
+  color:#8c897f !important;
+  border-color:#d4d0c5 !important;
+}
+
+/* Admin Catalog & Stock Management */
+.admin-existing-products{
+  margin-bottom:28px;
+}
+.admin-catalog-header-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  flex-wrap:wrap;
+  gap:16px;
+  padding-bottom:18px;
+  margin-bottom:20px;
+  border-bottom:1px solid #eae7df;
+}
+.admin-catalog-summary-pills{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.admin-catalog-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:18px;
+}
+.admin-catalog-card{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  background:#faf9f6;
+  border:1px solid #e2ded5;
+  padding:16px;
+  border-radius:8px;
+  position:relative;
+  transition:border-color .2s ease,box-shadow .2s ease;
+}
+.admin-catalog-card.is-oos-card{
+  background:#fcfaf9;
+  border-color:#e9d5d5;
+}
+.admin-catalog-badges-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+}
+.admin-catalog-badge{
+  position:static;
+  font-size:9px;
+  font-weight:700;
+  padding:4px 8px;
+  background:#eae7e0;
+  border-radius:4px;
+  color:#555;
+  letter-spacing:.08em;
+}
+.admin-stock-pill{
+  display:inline-flex;
+  align-items:center;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.1em;
+  padding:4px 9px;
+  border-radius:4px;
+  text-transform:uppercase;
+}
+.admin-stock-pill.is-instock{
+  background:#ecfdf5;
+  color:#065f46;
+  border:1px solid #a7f3d0;
+}
+.admin-stock-pill.is-oos{
+  background:#fef2f2;
+  color:#991b1b;
+  border:1px solid #fecaca;
+}
+.admin-catalog-card .admin-catalog-thumb{
+  width:100%;
+  height:180px;
+  object-fit:cover;
+  border-radius:6px;
+  background:#111;
+}
+.admin-catalog-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid #e8e4da;
+}
+.admin-stock-toggle-btn{
+  flex:1;
+  min-width:130px;
+  padding:8px 10px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.08em;
+  border-radius:5px;
+  cursor:pointer;
+  transition:all .2s ease;
+}
+.admin-stock-toggle-btn.is-instock{
+  background:#fff7ed;
+  border:1px solid #fdba74;
+  color:#9a3412;
+}
+.admin-stock-toggle-btn.is-instock:hover{
+  background:#ea580c;
+  border-color:#ea580c;
+  color:#fff;
+}
+.admin-stock-toggle-btn.is-oos{
+  background:#ecfdf5;
+  border:1px solid #6ee7b7;
+  color:#065f46;
+}
+.admin-stock-toggle-btn.is-oos:hover{
+  background:#059669;
+  border-color:#059669;
+  color:#fff;
+}
+.admin-delete-prod-btn{
+  margin-top:0;
+  padding:8px 12px;
+  background:#fef2f2;
+  border:1px solid #fca5a5;
+  color:#b91c1c;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.08em;
+  cursor:pointer;
+  border-radius:5px;
+  transition:all .2s ease;
+}
+.admin-delete-prod-btn:hover{
+  background:#b91c1c;
+  border-color:#b91c1c;
+  color:#fff;
+}
+.admin-deleted-core-wrap{
+  margin-top:22px;
+  padding:18px 20px;
+  background:#f8f6f0;
+  border:1px dashed #c8c2b4;
+  border-radius:8px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:14px;
+}
+.admin-deleted-core-wrap strong{
+  display:block;
+  font-size:13px;
+  color:#1d1e1b;
+  margin-bottom:3px;
+}
+.admin-deleted-core-wrap p{
+  margin:0;
+  font-size:12px;
+  color:#727068;
+}
+.admin-deleted-core-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.admin-restore-core-btn{
+  padding:9px 14px;
+  background:#183a2c;
+  color:#f4f2ec;
+  border:1px solid #183a2c;
+  border-radius:6px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.12em;
+  cursor:pointer;
+  transition:all .2s ease;
+}
+.admin-restore-core-btn:hover{
+  background:#214d3b;
+  transform:translateY(-1px);
+}
