@@ -1099,6 +1099,23 @@ async function getSupabase(){
   }
   return supabaseClientPromise;
 }
+async function sendOwnerOrderNotification({ orderId, orderNumber = '', customerEmail = '', mode = 'auto', accessToken = '' }){
+  const headers = { 'Content-Type': 'application/json' };
+  if(accessToken){
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  const response = await fetch('/api/new-order-email', {
+    method: 'POST',
+    headers,
+    keepalive: mode === 'auto',
+    body: JSON.stringify({ orderId, orderNumber, customerEmail, mode })
+  });
+  const result = await response.json().catch(() => ({}));
+  if(!response.ok){
+    throw new Error(result.error || 'Owner order email could not be sent.');
+  }
+  return result;
+}
 function setupCheckout(){
   const form=document.getElementById('checkout-form');
   if(!form)return;
@@ -1144,6 +1161,21 @@ function setupCheckout(){
       });
       if(error)throw new Error(error.message);
       if(!data?.order_number||!Number.isFinite(Number(data.total_amount)))throw new Error('The order was saved, but its confirmation details were incomplete. Please contact WJ NOIR before placing another order.');
+      if(data?.order_id){
+        try{
+          await Promise.race([
+            sendOwnerOrderNotification({
+              orderId:data.order_id,
+              orderNumber:data.order_number,
+              customerEmail:String(values.email).trim(),
+              mode:'auto'
+            }),
+            new Promise(resolve=>setTimeout(resolve,2500))
+          ]);
+        }catch(emailError){
+          console.error('Order saved, but owner notification email could not be delivered.',emailError);
+        }
+      }
       const orderTotal=Number(data.total_amount);
       sessionStorage.setItem('wj-noir-confirmation',JSON.stringify({orderNumber:data.order_number,email:String(values.email).trim(),total:orderTotal}));
       if(sessionStorage.getItem('wj-noir-checkout-from-cart')==='true'){cart=[];saveCart();}
@@ -1197,7 +1229,27 @@ async function loadAdminDashboard(client){
   await refreshAdminOrders(client);
   if(adminChannel)return;
   adminChannel=client.channel('wj-noir-admin-orders')
-    .on('postgres_changes',{event:'*',schema:'public',table:'orders'},()=>refreshAdminOrders(client).catch(error=>console.error('Unable to refresh admin orders.',error)))
+    .on('postgres_changes',{event:'*',schema:'public',table:'orders'},async payload=>{
+      if(payload?.eventType==='INSERT'&&payload?.new?.id){
+        const incomingOrder=payload.new;
+        showToast(`New order ${incomingOrder.order_number||''} received! Syncing email alert to wjnoir@gmail.com…`);
+        try{
+          const {data:sessionData}=await client.auth.getSession();
+          const accessToken=sessionData?.session?.access_token||'';
+          if(accessToken){
+            sendOwnerOrderNotification({
+              orderId:incomingOrder.id,
+              orderNumber:incomingOrder.order_number||'',
+              mode:'auto',
+              accessToken
+            }).catch(emailError=>console.error('Unable to sync owner notification email.',emailError));
+          }
+        }catch(sessionError){
+          console.error('Unable to verify admin session for incoming order email.',sessionError);
+        }
+      }
+      refreshAdminOrders(client).catch(error=>console.error('Unable to refresh admin orders.',error));
+    })
     .subscribe((status,error)=>{
       if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
         console.error('Admin order live updates are unavailable.',error);
@@ -2110,7 +2162,8 @@ function renderAdminDashboard(client){
           ${['pending','confirmed','shipped','delivered','cancelled'].map(status=>`<option value="${status}">${status}</option>`).join('')}
         </select>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+      <div class="admin-owner-alert-bar">
+        <span>✉️ Owner order alerts active → <strong>wjnoir@gmail.com</strong> (customer details sent automatically on every new order)</span>
         <button type="button" id="admin-delete-all" class="admin-danger" ${adminOrders.length?'':'disabled'}>DELETE ALL ORDERS</button>
       </div>
       <div id="admin-order-list" class="admin-order-list"></div>
@@ -2204,9 +2257,32 @@ function renderAdminOrders(){
     const isOpen=selectedAdminOrderId===order.id;
     const items=(order.order_items||[]).map(item=>`<div class="admin-detail-item"><span>${escapeHtml(item.product_name)} · ${item.size_ml} ml × ${item.quantity}</span><strong>PKR ${(Number(item.unit_price)*item.quantity).toLocaleString('en-PK')}</strong></div>`).join('');
     const address=[order.address,order.city,order.state,order.postal_code,order.country].filter(Boolean).map(escapeHtml).join(', ');
-    return `<article class="admin-order-card"><button class="admin-order-toggle" type="button" data-order-detail="${order.id}" aria-expanded="${isOpen}"><span><strong>${escapeHtml(order.order_number)}</strong><small>${escapeHtml(order.customer_name)} · ${new Date(order.created_at).toLocaleString()}</small></span><span class="admin-order-total">PKR ${Number(order.total_amount).toLocaleString('en-PK')}</span><span class="admin-status admin-status--${escapeHtml(order.status)}">${escapeHtml(order.status)}</span></button>${isOpen?`<div class="admin-order-details"><p><strong>Email</strong> <a href="mailto:${escapeHtml(order.email)}">${escapeHtml(order.email)}</a></p><p><strong>Phone</strong> ${escapeHtml(order.phone)}</p><p><strong>Address</strong> ${address}</p><p><strong>Payment</strong> ${escapeHtml(order.payment_method)}</p>${order.notes?`<p><strong>Notes</strong> ${escapeHtml(order.notes)}</p>`:''}<div class="admin-detail-items">${items}</div><div class="admin-order-actions"><label class="admin-status-control">Update status<select data-order-status="${order.id}">${['pending','confirmed','shipped','delivered','cancelled'].map(value=>`<option value="${value}" ${value===order.status?'selected':''}>${value}</option>`).join('')}</select></label><button type="button" class="admin-delete-order" data-delete-order="${order.id}" data-delete-order-number="${escapeHtml(order.order_number)}">DELETE ORDER</button></div></div>`:''}</article>`;
+    return `<article class="admin-order-card"><button class="admin-order-toggle" type="button" data-order-detail="${order.id}" aria-expanded="${isOpen}"><span><strong>${escapeHtml(order.order_number)}</strong><small>${escapeHtml(order.customer_name)} · ${new Date(order.created_at).toLocaleString()}</small></span><span class="admin-order-total">PKR ${Number(order.total_amount).toLocaleString('en-PK')}</span><span class="admin-status admin-status--${escapeHtml(order.status)}">${escapeHtml(order.status)}</span></button>${isOpen?`<div class="admin-order-details"><p><strong>Email</strong> <a href="mailto:${escapeHtml(order.email)}">${escapeHtml(order.email)}</a></p><p><strong>Phone</strong> ${escapeHtml(order.phone)}</p><p><strong>Address</strong> ${address}</p><p><strong>Payment</strong> ${escapeHtml(order.payment_method)}</p>${order.notes?`<p><strong>Notes</strong> ${escapeHtml(order.notes)}</p>`:''}<div class="admin-detail-items">${items}</div><div class="admin-order-actions"><label class="admin-status-control">Update status<select data-order-status="${order.id}">${['pending','confirmed','shipped','delivered','cancelled'].map(value=>`<option value="${value}" ${value===order.status?'selected':''}>${value}</option>`).join('')}</select></label><div class="admin-order-action-buttons"><button type="button" class="admin-owner-email-btn" data-email-owner="${order.id}" data-email-order-number="${escapeHtml(order.order_number)}">✉️ EMAIL TO wjnoir@gmail.com</button><button type="button" class="admin-delete-order" data-delete-order="${order.id}" data-delete-order-number="${escapeHtml(order.order_number)}">DELETE ORDER</button></div></div></div>`:''}</article>`;
   }).join('');
   container.querySelectorAll('[data-order-detail]').forEach(button=>button.addEventListener('click',()=>{selectedAdminOrderId=selectedAdminOrderId===button.dataset.orderDetail?null:button.dataset.orderDetail;renderAdminOrders();}));
+  container.querySelectorAll('[data-email-owner]').forEach(button=>button.addEventListener('click',async()=>{
+    const orderId=button.dataset.emailOwner;
+    const orderNumber=button.dataset.emailOrderNumber||'this order';
+    button.disabled=true;
+    const originalText=button.textContent;
+    button.textContent='SENDING TO OWNER…';
+    try{
+      const client=await getSupabase();
+      const {data:sessionData,error:sessionError}=await client.auth.getSession();
+      if(sessionError)throw new Error(sessionError.message);
+      const accessToken=sessionData?.session?.access_token;
+      if(!accessToken)throw new Error('Your admin session expired. Please sign in again.');
+
+      await sendOwnerOrderNotification({orderId,orderNumber,mode:'manual',accessToken});
+      showToast(`All customer details for ${orderNumber} emailed to wjnoir@gmail.com.`);
+    }catch(error){
+      console.error('Unable to send owner order email.',error);
+      showToast(error.message||'Could not send owner email.');
+    }finally{
+      button.disabled=false;
+      button.textContent=originalText;
+    }
+  }));
   container.querySelectorAll('[data-delete-order]').forEach(button=>button.addEventListener('click',async()=>{
     const orderId=button.dataset.deleteOrder;
     const orderNumber=button.dataset.deleteOrderNumber||'this order';
