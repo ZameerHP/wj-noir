@@ -18,12 +18,31 @@ function loadStoredCustomProducts(){
 
 let fragrances = [...defaultFragrances, ...loadStoredCustomProducts()];
 
+const DEFAULT_SALE_BANNER = '/assets/wj-noir-11-11-sale-banner.jpg';
 function resolveAssetUrl(src){
-  if(!src) return '/assets/dark-collection.webp';
-  if(src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/')){
-    return src;
+  if(!src || typeof src !== 'string') return '/assets/dark-collection.webp';
+  const trimmed = src.trim();
+  if(!trimmed || trimmed === 'null' || trimmed === 'undefined') return '/assets/dark-collection.webp';
+  if(trimmed.startsWith('data:') || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')){
+    return trimmed;
   }
-  return ASSET + src;
+  if(trimmed.startsWith('./assets/')){
+    return trimmed.slice(1);
+  }
+  if(trimmed.startsWith('assets/')){
+    return '/' + trimmed;
+  }
+  return ASSET + trimmed;
+}
+function resolveBannerImageUrl(src){
+  if(!src || typeof src !== 'string') return DEFAULT_SALE_BANNER;
+  const trimmed = src.trim();
+  if(!trimmed || trimmed === 'null' || trimmed === 'undefined') return DEFAULT_SALE_BANNER;
+  const resolved = resolveAssetUrl(trimmed);
+  if(resolved.startsWith('data:image/') || resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/')){
+    return resolved;
+  }
+  return DEFAULT_SALE_BANNER;
 }
 const app = document.getElementById('app');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -151,20 +170,44 @@ function rebuildFragrancesCatalog(){
 
 rebuildFragrancesCatalog();
 
+function getCatalogRenderSignature(){
+  return JSON.stringify({
+    saleActive: Boolean(activeSale?.is_active),
+    discount: activeSale?.discount_percentage ?? 0,
+    targetType: activeSale?.target_type || '',
+    targetCategory: activeSale?.target_category || '',
+    targetIds: activeSale?.target_product_ids || [],
+    customPrices: activeSale?.custom_prices || {},
+    startDate: activeSale?.start_date || null,
+    endDate: activeSale?.end_date || null,
+    banner: activeSale?.banner_image || '',
+    items: fragrances.map(p => `${p.id}:${p.price}:${Boolean(p.outOfStock)}:${p.image}`)
+  });
+}
+
+let lastRenderedSignature = getCatalogRenderSignature();
+
 function refreshViewOnBackgroundSync(){
   rebuildFragrancesCatalog();
   renderBag();
+  const nextSignature = getCatalogRenderSignature();
   const path = routePath();
   if(path === '/admin'){
+    lastRenderedSignature = nextSignature;
     if(document.querySelector('.admin-navbar')){
       getSupabase().then(client => renderAdminDashboard(client)).catch(()=>{});
     }
     return;
   }
   if(path === '/checkout' && document.getElementById('checkout-form')){
+    lastRenderedSignature = nextSignature;
     return;
   }
-  route();
+  if(nextSignature === lastRenderedSignature){
+    return;
+  }
+  lastRenderedSignature = nextSignature;
+  route({ preserveScroll: true });
 }
 
 function getProductPricing(p){
@@ -334,7 +377,7 @@ function card(p, extra='', reveal=true) {
   const totalCatalogCount = String(fragrances.length).padStart(2, '0');
   return `<article class="product-card ${extra} ${isOOS ? 'is-out-of-stock' : ''} ${reveal?'reveal':''}">
     <a class="product-image-wrap" href="/fragrance/${p.id}" aria-label="Discover ${escapeHtml(p.title)}">
-      <img loading="lazy" decoding="async" src="${resolveAssetUrl(p.image)}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/>
+      <img loading="eager" decoding="async" src="${resolveAssetUrl(p.image)}" alt="WJ NOIR ${escapeHtml(p.title)} fragrance" style="object-position:${p.photoPosition}"/>
       ${badge}
       <span class="product-hover">${isOOS ? 'OUT OF STOCK · VIEW DETAILS ↗' : 'DISCOVER FRAGRANCE ↗'}</span>
       <span class="product-number">${p.number} / ${totalCatalogCount}</span>
@@ -355,12 +398,12 @@ function home() { return `
     <section class="hero" id="hero" aria-label="WJ NOIR fragrance film campaign"><div class="hero-video-wrap"><video id="hero-video" class="hero-video" muted loop playsinline preload="none" poster="${ASSET}the-office-poster.jpg"><source src="${ASSET}the-office-hero.mp4" type="video/mp4"/></video></div><div class="hero-shade"></div><div class="hero-noise"></div><div class="hero-top-copy"><p class="hero-intro animate-in">For those who choose their own way.<br/>Your presence. Your signature. Your rules.</p></div><div class="hero-proof animate-in" aria-label="Three signature fragrances"><div class="hero-fragrance-orbit"><img src="${ASSET}wj-noir-the-office.jpg" alt="" decoding="async" fetchpriority="low"/><img src="${ASSET}wj-noir-ice-desire.jpg" alt="" decoding="async" fetchpriority="low"/><img src="${ASSET}wj-noir-levoria.jpg" alt="" decoding="async" fetchpriority="low"/></div><p>THREE SIGNATURES.<br/>ONE UNMISTAKABLE PRESENCE.</p></div><div class="hero-content"><p class="eyebrow hero-kicker animate-in"><span class="line-accent"></span>THE WORLD OF WJ NOIR <span class="kicker-index">— 001</span></p><h1 class="animate-in hero-heading">WEAR YOUR<br/><em>PRESENCE.</em></h1><p class="hero-description animate-in">An entrance you feel.<br/>An impression that stays.</p></div><div class="hero-actions animate-in">${buttonLink('/about','DISCOVER THE HOUSE','outline')}${buttonLink('/shop','SHOP THE COLLECTION')}</div><div class="hero-bottom"><span class="hero-scroll">SCROLL TO DISCOVER <span class="scroll-line"></span></span><span>01 / 03 — THE SIGNATURE COLLECTION</span><span class="hero-video-mark">FILM 001&nbsp; ↗</span></div></section>
     <section class="about-intro section-pad" id="story"><span class="eyebrow ink-muted">THE HOUSE OF WJ NOIR</span><p>We create fragrances for those who choose their own way. Each scent is thoughtfully composed to express individuality, leave a lasting impression, and feel unmistakably yours.</p><a class="about-intro-link" href="/about">OUR STORY <span>↗</span></a></section>
     <section class="products-section most-wanted-section" id="collection"><div class="section-heading-row reveal"><div><span class="eyebrow ink-muted">THE WJ NOIR COLLECTION</span><h2>MOST WANTED</h2></div><a class="most-wanted-explore" href="/shop">EXPLORE ALL <span>↗</span></a></div><div class="products-grid">${fragrances.map(p=>card(p,'most-wanted-card')).join('')}</div><div class="under-products reveal"><span>THREE DISTINCT WORLDS. ONE UNMISTAKABLE PRESENCE.</span><span>50 ML / EAU DE PARFUM</span></div></section>
-    <section class="collection-banner" id="after-hours"><div class="collection-bg"><img loading="lazy" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR three perfumes on dark wet volcanic rocks and water"/></div><div class="collection-gradient"></div><div class="collection-copy reveal"><div class="eyebrow light-muted"><span class="line-accent"></span>THE COLLECTION / NO. 01</div><h2>AFTER<br/><em>HOURS.</em></h2><p>Dark. Distinct. Uncompromising.<br/>A signature that refuses to go unnoticed.</p>${buttonLink('/shop','EXPLORE COLLECTION')}</div><div class="banner-footnote">THE NOIR EDIT&nbsp; / &nbsp;WJ FRAGRANCE HOUSE</div></section>
-    <section class="editorial-section" id="universes"><div class="editorial-heading section-pad reveal"><span class="eyebrow ink-muted">BEYOND THE ORDINARY / 002</span><h2>Three scents.<br/><em>Infinite expression.</em></h2><p>Every signature has its own world. Find the one that feels like yours.</p></div><div class="editorial-grid"><a href="/fragrance/ice-desire" class="editorial-card cold reveal"><div class="editorial-photo"><img loading="lazy" decoding="async" src="${ASSET}wj-noir-ice-desire-water.jpg" alt="Ice Desire perfume among snow, mountains and icy reflective water"/></div><div class="editorial-copy"><span>01 / FRESH. REFINED. UNTOUCHED.</span><div><h3>ICE <em>DESIRE.</em></h3><span class="editorial-arrow">↗</span></div></div></a><a href="/fragrance/levoria" class="editorial-card warm reveal"><div class="editorial-photo"><img loading="lazy" decoding="async" src="${ASSET}wj-noir-levoria.jpg" alt="Lévoria deep burgundy perfume with vanilla blossoms and warm sunlight"/></div><div class="editorial-copy"><span>02 / SOFT. GOLDEN. UNFORGETTABLE.</span><div><h3><em>LÉVORIA.</em></h3><span class="editorial-arrow">↗</span></div></div></a></div></section>
+    <section class="collection-banner" id="after-hours"><div class="collection-bg"><img loading="eager" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR three perfumes on dark wet volcanic rocks and water"/></div><div class="collection-gradient"></div><div class="collection-copy reveal"><div class="eyebrow light-muted"><span class="line-accent"></span>THE COLLECTION / NO. 01</div><h2>AFTER<br/><em>HOURS.</em></h2><p>Dark. Distinct. Uncompromising.<br/>A signature that refuses to go unnoticed.</p>${buttonLink('/shop','EXPLORE COLLECTION')}</div><div class="banner-footnote">THE NOIR EDIT&nbsp; / &nbsp;WJ FRAGRANCE HOUSE</div></section>
+    <section class="editorial-section" id="universes"><div class="editorial-heading section-pad reveal"><span class="eyebrow ink-muted">BEYOND THE ORDINARY / 002</span><h2>Three scents.<br/><em>Infinite expression.</em></h2><p>Every signature has its own world. Find the one that feels like yours.</p></div><div class="editorial-grid"><a href="/fragrance/ice-desire" class="editorial-card cold reveal"><div class="editorial-photo"><img loading="eager" decoding="async" src="${ASSET}wj-noir-ice-desire-water.jpg" alt="Ice Desire perfume among snow, mountains and icy reflective water"/></div><div class="editorial-copy"><span>01 / FRESH. REFINED. UNTOUCHED.</span><div><h3>ICE <em>DESIRE.</em></h3><span class="editorial-arrow">↗</span></div></div></a><a href="/fragrance/levoria" class="editorial-card warm reveal"><div class="editorial-photo"><img loading="eager" decoding="async" src="${ASSET}wj-noir-levoria.jpg" alt="Lévoria deep burgundy perfume with vanilla blossoms and warm sunlight"/></div><div class="editorial-copy"><span>02 / SOFT. GOLDEN. UNFORGETTABLE.</span><div><h3><em>LÉVORIA.</em></h3><span class="editorial-arrow">↗</span></div></div></a></div></section>
     <section class="quote-section"><div class="quote-outline">WJ NOIR</div><div class="quote-center reveal"><div class="eyebrow gold-muted">THE HOUSE PHILOSOPHY</div><div class="quote-mark">“</div><blockquote>Wear your presence.<br/><em>Leave your story.</em></blockquote><div class="quote-symbol">✦</div></div></section>
-    <section class="closing-visual"><img loading="lazy" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR collection displayed beside a reflective alpine lake"/><div class="closing-overlay"></div><div class="closing-content reveal"><span class="eyebrow">WJ NOIR / THE COLLECTION</span><h2>YOUR NEXT<br/><em>SIGNATURE.</em></h2>${buttonLink('/shop','DISCOVER ALL FRAGRANCES')}</div></section>
+    <section class="closing-visual"><img loading="eager" decoding="async" src="${ASSET}dark-collection.webp" alt="WJ NOIR collection displayed beside a reflective alpine lake"/><div class="closing-overlay"></div><div class="closing-content reveal"><span class="eyebrow">WJ NOIR / THE COLLECTION</span><h2>YOUR NEXT<br/><em>SIGNATURE.</em></h2>${buttonLink('/shop','DISCOVER ALL FRAGRANCES')}</div></section>
   </main>`; }
-function shop() { return `<main class="interior-page"><section class="page-intro shop-intro"><span class="eyebrow ink-muted">WJ NOIR / THE COLLECTION</span><h1>Find your <em>signature.</em></h1><p>Three distinct expressions of the unforgettable. Discover your world.</p></section><div class="shop-filter-row"><span>THE COMPLETE COLLECTION / ${String(fragrances.length).padStart(2, '0')}</span><span>EAU DE PARFUM · 50 ML</span></div><section class="shop-products section-pad"><div class="products-grid">${fragrances.map(p=>card(p)).join('')}</div></section><section class="shop-visual"><img src="${ASSET}dark-collection-alt.webp" alt="WJ NOIR fragrance collection on glossy black rocks" loading="lazy"/><div class="shop-visual-copy"><span class="eyebrow">A WORLD OF DISTINCTION</span><h2>THE NOIR <em>EDIT.</em></h2></div></section></main>`; }
+function shop() { return `<main class="interior-page"><section class="page-intro shop-intro"><span class="eyebrow ink-muted">WJ NOIR / THE COLLECTION</span><h1>Find your <em>signature.</em></h1><p>Three distinct expressions of the unforgettable. Discover your world.</p></section><div class="shop-filter-row"><span>THE COMPLETE COLLECTION / ${String(fragrances.length).padStart(2, '0')}</span><span>EAU DE PARFUM · 50 ML</span></div><section class="shop-products section-pad"><div class="products-grid">${fragrances.map(p=>card(p)).join('')}</div></section><section class="shop-visual"><img src="${ASSET}dark-collection-alt.webp" alt="WJ NOIR fragrance collection on glossy black rocks" loading="eager" decoding="async"/><div class="shop-visual-copy"><span class="eyebrow">A WORLD OF DISTINCTION</span><h2>THE NOIR <em>EDIT.</em></h2></div></section></main>`; }
 function about() {
   return `<main class="interior-page about-editorial-page">
     <section class="about-editorial-intro section-pad reveal">
@@ -456,7 +499,7 @@ function product(p) {
                <p class="product-price-note">This fragrance is currently out of stock. Check back soon for restock updates.</p>`
             : `<button type="button" class="purchase-button purchase-primary" data-buy-now="${p.id}">BUY NOW <span>↗</span></button>
                <button type="button" class="purchase-button purchase-secondary" data-add-cart="${p.id}">ADD TO CART</button>
-               <p class="product-price-note">Cash on delivery available. Your order will be confirmed by email.</p>`
+               <p class="product-price-note">Cash on delivery available across Pakistan. We will contact you to confirm delivery.</p>`
           }
         </div>
         <div class="product-accordions">
@@ -599,7 +642,7 @@ function renderAndOpenSalePopup(){
   if(isSalePopupDismissed()) return;
   if(document.getElementById('sale-popup-modal')) return;
 
-  const bannerSrc = (activeSale && activeSale.banner_image) ? activeSale.banner_image : '/assets/wj-noir-11-11-sale-banner.jpg';
+  const bannerSrc = resolveBannerImageUrl(activeSale?.banner_image);
   const modal = document.createElement('div');
   modal.id = 'sale-popup-modal';
   modal.className = 'sale-popup-overlay';
@@ -608,7 +651,7 @@ function renderAndOpenSalePopup(){
     <div class="sale-popup-container" role="dialog" aria-modal="true" aria-label="11.11 Big Sale Announcement">
       <button type="button" class="sale-popup-close" data-close-sale-popup aria-label="Close sale announcement">×</button>
       <a href="/shop" class="sale-popup-image-wrap" data-close-sale-popup aria-label="Shop the 11.11 Big Sale">
-        <img src="${bannerSrc}" alt="${escapeHtml(activeSale?.campaign_title || '11.11 Big Sale')}" loading="eager"/>
+        <img src="${escapeHtml(bannerSrc)}" data-fallback="${DEFAULT_SALE_BANNER}" alt="${escapeHtml(activeSale?.campaign_title || '11.11 Big Sale')}" loading="eager" decoding="async"/>
       </a>
       <div class="sale-popup-footer">
         <span class="sale-popup-kicker">LIMITED TIME · 11.11</span>
@@ -620,6 +663,12 @@ function renderAndOpenSalePopup(){
       </div>
     </div>
   `;
+  const popupImg = modal.querySelector('.sale-popup-image-wrap img');
+  popupImg?.addEventListener('error', () => {
+    if(popupImg.dataset.fallbackApplied === 'true') return;
+    popupImg.dataset.fallbackApplied = 'true';
+    popupImg.src = DEFAULT_SALE_BANNER;
+  }, { once: true });
   document.body.appendChild(modal);
   document.body.classList.add('lock-scroll');
 
@@ -679,6 +728,10 @@ function checkAndShowSalePopup(){
   if(isSalePopupDismissed()) return;
   if(document.getElementById('sale-popup-modal')) return;
 
+  // Preload offer image so it paints immediately at 7s
+  const preloadBanner = new Image();
+  preloadBanner.src = resolveBannerImageUrl(activeSale?.banner_image);
+
   // If timer is already running towards 7 seconds, let it complete
   if(salePopupTimer) return;
 
@@ -688,7 +741,54 @@ function checkAndShowSalePopup(){
     renderAndOpenSalePopup();
   }, 7000);
 }
-function setupReveals(){const els=document.querySelectorAll('.reveal'); if(reducedMotion || !('IntersectionObserver' in window)){els.forEach(e=>e.classList.add('is-visible'));return;} const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}})},{threshold:.08,rootMargin:'0px 0px -35px 0px'});els.forEach(e=>io.observe(e));}
+let revealObserver = null;
+let revealScrollHandler = null;
+let revealFallbackTimer = null;
+function setupReveals(){
+  if(revealObserver){ revealObserver.disconnect(); revealObserver = null; }
+  if(revealScrollHandler){ window.removeEventListener('scroll', revealScrollHandler); revealScrollHandler = null; }
+  clearTimeout(revealFallbackTimer);
+
+  const els = [...document.querySelectorAll('.reveal')];
+  if(!els.length) return;
+
+  if(reducedMotion || !('IntersectionObserver' in window)){
+    els.forEach(e => e.classList.add('is-visible'));
+    return;
+  }
+
+  const revealIfVisibleOrPassed = () => {
+    const vh = window.innerHeight || 900;
+    els.forEach(el => {
+      if(el.classList.contains('is-visible')) return;
+      const rect = el.getBoundingClientRect();
+      if(rect.top <= vh + 160){
+        el.classList.add('is-visible');
+      }
+    });
+  };
+
+  revealIfVisibleOrPassed();
+
+  revealObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        e.target.classList.add('is-visible');
+        revealObserver?.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.01, rootMargin: '160px 0px 160px 0px' });
+
+  els.forEach(el => {
+    if(!el.classList.contains('is-visible')) revealObserver.observe(el);
+  });
+
+  revealScrollHandler = () => revealIfVisibleOrPassed();
+  window.addEventListener('scroll', revealScrollHandler, { passive: true });
+  revealFallbackTimer = setTimeout(() => {
+    els.forEach(el => el.classList.add('is-visible'));
+  }, 1400);
+}
 function setupVideo(){
   const connection=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
   const allowMotionVideo=!reducedMotion&&!connection?.saveData&&!['slow-2g','2g'].includes(connection?.effectiveType);
@@ -933,7 +1033,9 @@ function updateSeo(path,p){
   schema.textContent=JSON.stringify({'@context':'https://schema.org','@graph':graph});
 }
 function navigateTo(path){history.pushState({},'',path);route();}
-function route(){
+function route(options = {}){
+  const preserveScroll = Boolean(options?.preserveScroll);
+  const previousScrollY = preserveScroll ? window.scrollY : 0;
   const path=routePath();
   if(adminChannel){getSupabase().then(client=>client.removeChannel(adminChannel)).catch(error=>console.error('Unable to close the admin live-update channel.',error));adminChannel=null;}
   if(!path.startsWith('/fragrance/') && saleCountdownInterval){
@@ -951,7 +1053,8 @@ function route(){
   else if(path==='/admin')app.innerHTML=adminPage();
   else app.innerHTML=path==='/'?home():path==='/shop'?shop():path==='/about'?about():p?product(p):notFound();
   updateSeo(path,p);
-  window.scrollTo({top:0,behavior:'instant'});
+  lastRenderedSignature = getCatalogRenderSignature();
+  window.scrollTo({top:preserveScroll?previousScrollY:0,behavior:'instant'});
   setupReveals();setupVideo();setupGallery();setupPurchaseControls();setupCountdownTimer();
   document.querySelectorAll('[data-add]').forEach(btn=>btn.addEventListener('click',()=>addToCart(btn.dataset.add,1)));
   if(path==='/checkout')setupCheckout();
@@ -1082,7 +1185,7 @@ function confirmationPage(){
   try{confirmation=JSON.parse(sessionStorage.getItem('wj-noir-confirmation')||'null');}
   catch(error){console.error('Unable to read the order confirmation.',error);}
   if(!confirmation?.orderNumber)return `<main class="commerce-page confirmation-page"><span class="eyebrow ink-muted">WJ NOIR</span><h1>Your order details are unavailable.</h1><a class="button dark-btn" href="/">RETURN HOME <span>↗</span></a></main>`;
-  return `<main class="commerce-page confirmation-page"><span class="confirmation-mark" aria-hidden="true">✓</span><span class="eyebrow ink-muted">WJ NOIR / ORDER RECEIVED</span><h1>Thank you for your <em>order.</em></h1><p class="confirmation-order-number">ORDER ${escapeHtml(confirmation.orderNumber)}</p><p>We have received your order and will contact you soon. A confirmation email will be sent to <strong>${escapeHtml(confirmation.email)}</strong>.</p><div class="confirmation-total"><span>Order total · Cash on Delivery</span><strong>PKR ${Number(confirmation.total).toLocaleString('en-PK')}</strong></div><a class="button dark-btn" href="/">RETURN TO WJ NOIR <span>↗</span></a></main>`;
+  return `<main class="commerce-page confirmation-page"><span class="confirmation-mark" aria-hidden="true">✓</span><span class="eyebrow ink-muted">WJ NOIR / ORDER RECEIVED</span><h1>Thank you for your <em>order.</em></h1><p class="confirmation-order-number">ORDER ${escapeHtml(confirmation.orderNumber)}</p><p>We have received your order and our team will contact you shortly to confirm delivery details.</p><div class="confirmation-total"><span>Order total · Cash on Delivery</span><strong>PKR ${Number(confirmation.total).toLocaleString('en-PK')}</strong></div><a class="button dark-btn" href="/">RETURN TO WJ NOIR <span>↗</span></a></main>`;
 }
 async function getSupabase(){
   if(!supabaseClientPromise){
@@ -1231,8 +1334,9 @@ async function loadAdminDashboard(client){
   adminChannel=client.channel('wj-noir-admin-orders')
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'},async payload=>{
       if(payload?.eventType==='INSERT'&&payload?.new?.id){
+        if(routePath()!=='/admin') return;
         const incomingOrder=payload.new;
-        showToast(`New order ${incomingOrder.order_number||''} received! Syncing email alert to wjnoir@gmail.com…`);
+        showToast(`New order ${incomingOrder.order_number||''} received!`);
         try{
           const {data:sessionData}=await client.auth.getSession();
           const accessToken=sessionData?.session?.access_token||'';
@@ -1361,7 +1465,7 @@ function renderAdminSaleSectionMarkup(){
         <div class="admin-sale-field admin-sale-field--full">
           <label>Sale Popup Image (Ultra-Luxury Modal on Website Entry)</label>
           <div class="admin-banner-preview-box">
-            <img id="admin-sale-banner-preview" class="admin-banner-thumb" src="${escapeHtml(s.banner_image || '/assets/wj-noir-11-11-sale-banner.jpg')}" alt="Sale Banner Preview"/>
+            <img id="admin-sale-banner-preview" class="admin-banner-thumb" src="${escapeHtml(resolveBannerImageUrl(s.banner_image))}" alt="Sale Banner Preview"/>
             <div class="admin-banner-controls">
               <strong>Active Popup Graphic</strong>
               <p style="font-size:12px;color:#78766e;margin:0 0 6px">This poster is presented inside the ultra-luxury popup 2 seconds after a visitor lands on the homepage. Upload any new campaign artwork or reset to the 11.11 poster.</p>
@@ -1444,7 +1548,7 @@ function setupAdminSaleControls(client){
   const previewTbody = document.getElementById('admin-sale-preview-tbody');
   const saveBtn = document.getElementById('admin-save-sale');
 
-  let stagedBanner = (activeSale && activeSale.banner_image) ? activeSale.banner_image : '/assets/wj-noir-11-11-sale-banner.jpg';
+  let stagedBanner = resolveBannerImageUrl(activeSale?.banner_image);
   const fileInput = document.getElementById('admin-sale-banner-file');
   const uploadTrigger = document.getElementById('admin-banner-upload-trigger');
   const resetTrigger = document.getElementById('admin-banner-reset-trigger');
@@ -1648,8 +1752,8 @@ function setupAdminSaleControls(client){
 
 async function syncCatalogStateToSupabase(client, nextDeletedIds, nextOutOfStockIds, nextCustomProducts){
   try {
-    localStorage.setItem('wj-noir-deleted-product-ids', JSON.stringify(nextDeletedIds));
-    localStorage.setItem('wj-noir-out-of-stock-ids', JSON.stringify(nextOutOfStockIds));
+    localStorage.setItem('wj-noir-deleted-products', JSON.stringify(nextDeletedIds));
+    localStorage.setItem('wj-noir-out-of-stock-products', JSON.stringify(nextOutOfStockIds));
     localStorage.setItem('wj-noir-custom-products', JSON.stringify(nextCustomProducts));
   } catch(e){}
 
@@ -2409,8 +2513,21 @@ document.addEventListener('click',e=>{const closest=e.target.closest('[data-clos
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.querySelector('.product-image-zoom.is-open'))closeGalleryZoom();else closeAll();}});
 document.getElementById('newsletter-form').addEventListener('submit',e=>{e.preventDefault();document.getElementById('newsletter-message').textContent='Preview only: connect your newsletter provider before launch.';});
 document.getElementById('year').textContent=new Date().getFullYear();
+document.addEventListener('error', (event) => {
+  const img = event.target;
+  if(!(img instanceof HTMLImageElement)) return;
+  if(img.dataset.fallbackApplied === 'true') return;
+  img.dataset.fallbackApplied = 'true';
+  if(img.closest('#sale-popup-modal') || img.id === 'admin-sale-banner-preview'){
+    img.src = DEFAULT_SALE_BANNER;
+  } else if(img.dataset.fallback){
+    img.src = img.dataset.fallback;
+  } else {
+    img.src = '/assets/dark-collection.webp';
+  }
+}, true);
 window.addEventListener('storage',e=>{
-  if(['wj-noir-deleted-product-ids','wj-noir-out-of-stock-ids','wj-noir-custom-products','wj-noir-sale-settings-cache'].includes(e.key)){
+  if(['wj-noir-deleted-products','wj-noir-out-of-stock-products','wj-noir-custom-products','wj-noir-sale-settings-cache'].includes(e.key)){
     try{
       const cachedSale=localStorage.getItem('wj-noir-sale-settings-cache');
       if(cachedSale)activeSale=JSON.parse(cachedSale);
